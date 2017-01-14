@@ -417,7 +417,7 @@ class GA_helper ():
         
         info = {'fitness', fitness}
 
-#        wide_info = True
+        wide_info = False
         if wide_info:
             tt = self.getTT_RT(dna);
             rt_energy = calc_energy_RT (self.g, tt)
@@ -540,7 +540,7 @@ class GA_helper ():
         
         tt = self.getTT_RT(individual)
         if tt!= None:
-            self.g.draw (tt = tt, figure_name = images_path +'_gather.png')
+            self.g.draw (tt = tt, figure_name = images_path +'_gather.png', norm=None)
   
 #     
     def crossover(self, dna1, dna2):

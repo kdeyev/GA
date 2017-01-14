@@ -422,11 +422,15 @@ class gather ():
                 self.v[j][i] *= v
 
     def phase(self):
+        from scipy.signal import hilbert
+        
         v = numpy.transpose(self.v)
         
         for i in range (self.ntr):
-            phase = numpy.fft(v[i])
-            phase = numpy.angle(phase)
+            analytic_signal = hilbert(v[i])
+            phase = numpy.angle(analytic_signal)
+            phase = numpy.unwrap(phase)
+#            print  (phase)
             for j in range (self.nt):
                 self.v[j][i] = phase[j]
 
