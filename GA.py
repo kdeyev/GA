@@ -29,7 +29,7 @@ def generate1DModel (nx, nz, dx, dz, interfaces):
     return m    
         
     
-def calcEnergy_FD (c, vel, image_path = None):
+def calcEnergy_FD (c, vel, image_path = None, area = 25):
     import model_FD
     
     assert (c.back == 1)
@@ -71,6 +71,20 @@ def calcEnergy_FD (c, vel, image_path = None):
     [six, siz] = final.getIndex(sx, sz)
     six = int (six)
     siz = int (siz)
+   
+    exact_energy = final.v[six][siz]**2
+    
+    mask = copy.deepcopy(final)
+    for i in range (mask.nx):
+        for j in range (mask.nz):
+            [x,z] = final.getCoordByIndex (i, j)
+            dist = math.sqrt((sx- x)**2 + (sz-z)**2)
+            # dist 0 - taper = 1
+            # dist = area - taper = 0.5
+            taper = 1/(dist/area + 1)
+            mask.v[i][j] = taper
+
+#    mask.draw ('', 'mask.png')
 
     total_power = 0
     for i in range (final.nx):
@@ -82,31 +96,19 @@ def calcEnergy_FD (c, vel, image_path = None):
     entropy = 0
     for i in range (final.nx):
         for j in range (final.nz):
-            p_norm = final.v[i][j]**2/total_power
+            taper = mask.v[i][j]
+            p_norm = final.v[i][j]**2/total_power*taper
             entropy += p_norm*math.log(p_norm)
             
     entropy = -entropy
     
-    energy = final.v[six][siz]**2
-    
-#    for i in range (mask.nx):
-#        for j in range (mask.nz):
-#            [x,z] = final.getCoordByIndex (i, j)
-#            dist = math.sqrt((sx- x)**2 + (sz-z)**2)
-#            # dist 0 - taper = 1
-#            # dist = area - taper = 0.5
-#            taper = 1/(dist/area + 1)
-#            mask.v[i][j] = taper**4
-
-#    mask.draw ('', 'mask.png')
-    
     #take energy in source point
-#    energy = 0
-#    for i in range (mask.nx):
-#        for j in range (mask.nz):
-#            e = final.v[i][j]**2
-#            taper = mask.v[i][j]
-#            energy += e*taper
+    energy = 0
+    for i in range (mask.nx):
+        for j in range (mask.nz):
+            e = final.v[i][j]**2
+            taper = mask.v[i][j]
+            energy += e*taper
 #    
     # just for test
     if image_path != None:
@@ -122,7 +124,7 @@ def calcEnergy_FD (c, vel, image_path = None):
 #    import shutil    
 #    shutil.rmtree(test_name)
     
-    return energy, entropy
+    return exact_energy, entropy
         
 def calcMisfitEnergy_FD (c, vel, g, image_path = None):
     assert (c.back == 0)
