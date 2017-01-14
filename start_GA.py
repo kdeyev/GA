@@ -258,12 +258,16 @@ if __name__ == "__main__":
 #    g.draw ('', model_path + 'forward_gather.png')
 #    exit()
  
-    helper = GA.GA_helperI3 (c, g, m)
+    # 3
+#    helper = GA.GA_helperI3 (c, g, m)
+#    correct_dna = [[0, 2000],[125, 3500],[200, 3000]]
+
+    # 1
+    helper = GA.GA_helperI1 (c, g, m)
+    correct_dna = [125, 2000, 3500]
+
     helper.define_FD_energy()
-    
     images_path = c.path + 'GA_images/' 
-
-    correct_dna = [[0, 2000],[125, 3500],[200, 3000]]
-
+    
     GA.GA_run (helper, images_path, correct_dna,
         pop_size = 20, generatoin_count = 30, mutation = 0.1)    

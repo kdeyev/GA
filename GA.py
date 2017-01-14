@@ -408,9 +408,9 @@ class GA_helper ():
 
     def fitness(self, dna, image_path=None):
         if self.fd_rt == 0:
-            return self.__fitness_FD(dna)
+            return self.__fitness_FD(dna, image_path)
         if self.fd_rt == 1:
-            return self.__fitness_RT(dna)
+            return self.__fitness_RT(dna, image_path)
                 
     def __fitness_RT(self, dna, image_path=None):
         tt = self.getTT_RT(dna);
@@ -574,6 +574,18 @@ class GA_helperI1 (GA_helper):
         dna = [z1, v1, v2]
         return dna
         
+    @staticmethod
+    def fillModel1 (m, z1, v1, v2):  
+        for i in range (m.nx):
+            for j in range (m.nz):
+                z = j*m.dz 
+                v = v1
+                if (z > z1):
+                    v = v2
+                    
+                m.v[i][j] = v
+        
+        return m    
     
     @staticmethod
     def fillModel_RT (m, z1, v1, v2):
@@ -597,7 +609,7 @@ class GA_helperI1 (GA_helper):
         import model_FD
         
         m = model_FD.model(self.c.nx, self.c.nz, self.c.dh, self.c.dh)
-        dna_m = model_FD.fillModel1(m, dna[0], dna[1], dna[2])
+        dna_m = self.fillModel1(m, dna[0], dna[1], dna[2])
         return dna_m
             
     def mutate(self, dna, mutation_chance):        

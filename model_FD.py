@@ -944,18 +944,6 @@ class config ():
 ##path = '/home/cloudera/TRM/acoustic_FD_TRM/tests/'
 #    
 #
-#def fillModel1 (m, z1, v1, v2):  
-#    for i in range (m.nx):
-#        for j in range (m.nz):
-#            z = j*m.dz 
-#            v = v1
-#            if (z > z1):
-#                v = v2
-#                
-#            m.v[i][j] = v
-#    
-#    return m    
-#
 #     
 #def drawMod1(v1, v2, sl, figure_name):    
 #    import matplotlib.pyplot as plt
