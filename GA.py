@@ -77,6 +77,8 @@ def calcEnergy_FD (c, vel, image_path = None):
         for j in range (final.nz):
             total_power += final.v[i][j]**2
 
+    #print ('total_power', total_power)
+    
     entropy = 0
     for i in range (final.nx):
         for j in range (final.nz):
@@ -117,7 +119,7 @@ def calcEnergy_FD (c, vel, image_path = None):
     
             
     # detele scratch files
-    import shutil    
+#    import shutil    
 #    shutil.rmtree(test_name)
     
     return energy, entropy
@@ -413,9 +415,9 @@ class GA_helper ():
     def __fitness_RT(self, dna, image_path=None):
         tt = self.getTT_RT(dna);
         if self.rt_energy_semb == 0:
-            return calc_energy_RT (g, tt)
+            return calc_energy_RT (self.g, tt)
         if self.rt_energy_semb == 1:
-            return calc_semb_RT (g, tt)
+            return calc_semb_RT (self.g, tt)
 
     def __fitness_FD(self, dna, image_path=None):
         dna_m = self.getModel_FD(dna)
@@ -508,12 +510,13 @@ class GA_helper ():
         print ("Total fitness", weight_total)
 
     def draw (self, individual, images_path):
+        #print ('individual',individual)
 #        dna_m = self.getModel_FD(individual)
         self.fitness (individual, image_path=images_path)
         
         tt = self.getTT_RT(individual)
         if tt!= None:
-            g.draw (tt = tt, figure_name = images_path +'_gather.png')
+            self.g.draw (tt = tt, figure_name = images_path +'_gather.png')
   
 #     
     def crossover(self, dna1, dna2):
@@ -621,6 +624,7 @@ class GA_helperI2 (GA_helper):
         self.init(c, g, m)  
 
     def empty_model (self):
+        import model_FD
         lx = self.c.nx*self.c.dh
         lz = self.c.nz*self.c.dh
         new_dx = 10001
@@ -739,46 +743,15 @@ class GA_helperI3 (GA_helper):
 
 def GA_run (helper, images_path, correct_dna,
         pop_size = 20, generatoin_count = 30, mutation = 0.1):  
-#    pop_size = 20
-#    generatoin_count = 30
-#    mutation = 0.1
-#    area = 5
-
-#    helper = GA_helperI3 (c, g, m)
-#    helper.define_FD_energy()
     helper.print_info()
 
-#    images_path = c.path + 'GA_images/' 
     if not os.path.exists(images_path):
         os.makedirs(images_path)
         
-#    dna = [125, 2000, 3500]
-#    dna = [[0, 2000],[125, 3500],[200, 3000]]
     correct = helper.fitness(correct_dna)
     print ('Correct answer:', correct)
     
     helper.draw (correct_dna, images_path + "correct")
-    
-#    dna = [125, 2000, 3500]
-#    correct = helper.fitness(dna)
-#    while True:
-#        dna = helper.random_dna ()
-#        e = helper.fitness(dna)
-#        if e > correct:
-#            print ("Houston we have a problem", dna)
-    
-    
-#    population = []
-#    for v1 in numpy.arange(1500, 2500, 500):
-#        for v2 in numpy.arange(3000, 4000, 500):
-#            for z1 in numpy.arange(0, 250, 25):      
-#                dna = [z1, v1, v2]
-#                population.append(dna)
-#    
-#    weighted_population = helper.weight (population, area)
-#    helper.print_weight (weighted_population)
-#    
-#    return 
     
     # Generate initial population. This will create a list of POP_SIZE strings,
     # each initialized to a sequence of random characters.

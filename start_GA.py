@@ -7,7 +7,8 @@ Created on Sat Jan 14 00:06:47 2017
 """
 import os
 import GA
-
+import copy
+import subprocess
 
 
 def modelingOneModel(model_path):
@@ -27,7 +28,7 @@ def modelingOneModel(model_path):
 #    c.snap = c.nt
 
     
-    vel = generate1DModel (c.nx, c.nz, c.dh, c.dh, [[0, 2000],[125, 3500],[200, 3000]])
+    vel = GA.generate1DModel (c.nx, c.nz, c.dh, c.dh, [[0, 2000],[125, 3500],[200, 3000]])
     
 #    vel.draw ('', model_path + 'vel_gen.png')    
     vel.writeToFile (c.vp_file)
