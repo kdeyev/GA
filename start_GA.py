@@ -227,7 +227,38 @@ def modelingOneModel(model_path):
 #        
 #    c.createImages ()
 
+def run_SU (args, g):
+    import subprocess
+    import numpy
+    import segypy
+    
+    p = subprocess.Popen(
+        args, stdout=subprocess.PIPE, stdin=subprocess.PIPE)
+       
+    v = numpy.transpose(g.v)
+    in_data = bytearray()
+    for i in range (g.ntr):
+        header = bytearray(240)
 
+        segypy.setDefaultSTHValue (g.nt, header, "ns")
+        segypy.setDefaultSTHValue (int(g.dt*1000000), header, "dt")   
+        in_data.extend(header)
+
+        data = bytearray(g.nt*4) 
+        for j in range (g.nt):
+            segypy.setValue(v[i][j], data, j*4, 'f', segypy.endian, 1)
+        in_data.extend(data)
+        
+    out, err = p.communicate(input=in_data)
+    out_data_array = bytearray(out)
+           
+    trace_len = g.nt*4 + 240
+    for i in range(g.ntr):
+        v[i] = segypy.getValue(out_data_array, i*trace_len + 240, 'f', segypy.endian, g.nt)[0]
+        
+    g.v = numpy.transpose(v)
+    
+    return g
 
 if __name__ == "__main__":
     model_path = '//home/cloudera/TRM/acoustic_FD_TRM/tests/orhan/'
@@ -252,11 +283,20 @@ if __name__ == "__main__":
     
 #    #    # MUTE    
     g = c.readGather ()
-    g.norm(1e+3)
+#	g.norm(1e+3)
+
+	# agc
+    g.norm(1e+7)    
+    g= run_SU(['/home/cloudera/cwp/bin/suaddnoise', 'sn=10000'], g)
+    g= run_SU(['/home/cloudera/cwp/bin/suattributes', 'mode=phase'], g)
+#    g= run_SU(['/home/cloudera/cwp/bin/sugain', 'agc=1', 'wagc=0.1'], g)
+
+	# mute
 #    g = model_FD.muteDirect (g, c.dr, -0.1, 2000)
 #    g = model_FD.muteDirect (g, c.dr, 0.16, 3500)
 #    g = model_FD.muteOffset (g, c.dr, 0, 1000)
-#    g.draw ('', model_path + 'forward_gather.png')
+	# draw
+#    g.draw ('', model_path + 'forward_gather.png', norm=None)
 #    exit()
  
     # 3
@@ -267,7 +307,7 @@ if __name__ == "__main__":
     helper = GA.GA_helperI1 (c, g, m)
     correct_dna = [125, 2000, 3500]
 
-    helper.define_FD_entropy()
+    helper.define_RT_semb()
     images_path = c.path + 'GA_images/' 
     
     GA.GA_run (helper, images_path, correct_dna,

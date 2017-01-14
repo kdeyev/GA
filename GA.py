@@ -29,7 +29,7 @@ def generate1DModel (nx, nz, dx, dz, interfaces):
     return m    
         
     
-def calcEnergy_FD (c, vel, image_path = None, area = 25):
+def calcEnergy_FD (c, vel, image_path = None, area = 25, mask_pow=0):
     import model_FD
     
     assert (c.back == 1)
@@ -77,12 +77,17 @@ def calcEnergy_FD (c, vel, image_path = None, area = 25):
     mask = copy.deepcopy(final)
     for i in range (mask.nx):
         for j in range (mask.nz):
-            [x,z] = final.getCoordByIndex (i, j)
-            dist = math.sqrt((sx- x)**2 + (sz-z)**2)
-            # dist 0 - taper = 1
-            # dist = area - taper = 0.5
-            taper = 1/(dist/area + 1)
-            mask.v[i][j] = taper
+            mask.v[i][j] = 1
+
+    if mask_pow > 0:
+        for i in range (mask.nx):
+            for j in range (mask.nz):
+                [x,z] = final.getCoordByIndex (i, j)
+                dist = math.sqrt((sx- x)**2 + (sz-z)**2)
+                # dist 0 - taper = 1
+                # dist = area - taper = 0.5
+                taper = 1/(dist/area + 1)
+                mask.v[i][j] = taper
 
 #    mask.draw ('', 'mask.png')
 
@@ -380,7 +385,7 @@ class GA_helper ():
                 self.max_min = 0
                 print ('Energy')
             if self.rt_energy_semb == 1:
-                print ('Entropy')
+                print ('Semblance')
                 self.max_min = 0
                 
         if self.max_min == 0:
@@ -800,6 +805,9 @@ def GA_run (helper, images_path, correct_dna,
     print ('Init')
     helper.print_weight (weighted_population)
     print ("global best individual", global_best_ind, global_maximum_weight, global_best_fitness)
+    
+    # print start point
+    helper.draw (global_best_ind, images_path + "start")
 
     # Simulate all of the generations.
     for generation in range(generatoin_count):
