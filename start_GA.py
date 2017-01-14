@@ -266,7 +266,7 @@ if __name__ == "__main__":
     helper = GA.GA_helperI1 (c, g, m)
     correct_dna = [125, 2000, 3500]
 
-    helper.define_FD_energy()
+    helper.define_FD_entropy()
     images_path = c.path + 'GA_images/' 
     
     GA.GA_run (helper, images_path, correct_dna,

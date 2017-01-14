@@ -282,15 +282,16 @@ def weighted_choice(items):
 #  print ('distrib', l)
   
   n = random.uniform(0, weight_total)
-  for item, weight in items:
+  for item, weight, fitness in items:
     if n < weight:
       return item
     n = n - weight
   return item
 
-
 def bound_random(v, dv, v1, v2):
     rv = 100000
+    if v == None:
+        v = int((v1 + v2)/2)
     if dv == None:
         dv = int((v1 + v2)/2)
     while v + rv not in range(v1, v2) : 
@@ -306,16 +307,16 @@ def round_z (v1):
     dv1 = 5
     return round(v1/dv1)*dv1
     
-def random_v1(v1):
-    return round_v(bound_random (v1, 500, 1500, 5000))
+def random_v1(v1 = None):
+    return round_v(bound_random (v1, None, 1500, 5000))
   
-def random_v2(v2):
-    return round_v(bound_random (v2, 500, 1500, 5000))
+def random_v2(v2 = None):
+    return round_v(bound_random (v2, None, 1500, 5000))
     
-def random_z1(z1):
-    return round_z(bound_random (z1, 100, 50, 250))
+def random_z1(z1 = None):
+    return round_z(bound_random (z1, None, 50, 250)) # WARNINNG min depth 50m
     
-def random_v(v1 = 3000):
+def random_v(v1 = None):
     return round_v(bound_random (v1, None, 1500, 5000))    
     
 class GA_helper ():   
@@ -460,7 +461,7 @@ class GA_helper ():
 
             # Generate the (individual,fitness) pair, taking in account whether or
             # not we will accidently divide by zero.
-            pair = (individual, fitness_val)
+            pair = (individual, fitness_val, fitness_val)
 
             weighted_population.append(pair)
         return weighted_population
@@ -482,7 +483,6 @@ class GA_helper ():
                 pair = (individual, max_weight, fitness_val)
             else:
                 assert (1.0/fitness_val<max_weight)
-
                 pair = (individual, 1.0/fitness_val, fitness_val)
  
             weighted_population.append(pair)
@@ -490,23 +490,23 @@ class GA_helper ():
     
         
     def getBest(self, weighted_population):
-        (best_ind, maximum_fitness) = weighted_population[0]
+        (best_ind, maximum_weight, best_fitness) = weighted_population[0]
                 
         for i in range(len(weighted_population)):
-            if weighted_population[i][1] >= maximum_fitness:
-                (best_ind, maximum_fitness) = weighted_population[i]
+            if weighted_population[i][1] >= maximum_weight:
+                (best_ind, maximum_weight, best_fitness) = weighted_population[i]
                 
-        return (best_ind, maximum_fitness)
+        return (best_ind, maximum_weight, best_fitness)
         
     def print_weight (self, weighted_population) :      
         for i in range(len(weighted_population)):
             print (weighted_population[i])
             
-        (best_ind, maximum_fitness) = self.getBest(weighted_population)
+        (best_ind, maximum_weight, best_fitness) = self.getBest(weighted_population)
         
         weight_total = sum((item[1] for item in weighted_population))
 
-        print ("Best individual", best_ind, maximum_fitness)
+        print ("Best individual", best_ind, maximum_weight, best_fitness)
         print ("Total fitness", weight_total)
 
     def draw (self, individual, images_path):
@@ -567,9 +567,9 @@ class GA_helperI1 (GA_helper):
         self.init(c,g,m)    
 
     def random_dna(self):
-        z1 = random_z1(125)
-        v1 = random_v1(2000)
-        v2 = random_v2(3500)
+        z1 = random_z1()
+        v1 = random_v1()
+        v2 = random_v2()
         
         dna = [z1, v1, v2]
         return dna
@@ -771,11 +771,11 @@ def GA_run (helper, images_path, correct_dna,
     weighted_population = helper.weight (population)
 
     best_generation = 0
-    (global_best_ind, global_maximum_fitness) = helper.getBest(weighted_population)
+    (global_best_ind, global_maximum_weight, global_best_fitness) = helper.getBest(weighted_population)
     
     print ('Init')
     helper.print_weight (weighted_population)
-    print ("global best individual", global_best_ind, global_maximum_fitness)
+    print ("global best individual", global_best_ind, global_maximum_weight, global_best_fitness)
 
     # Simulate all of the generations.
     for generation in range(generatoin_count):
@@ -798,22 +798,24 @@ def GA_run (helper, images_path, correct_dna,
             population.append(helper.mutate(ind2, mutation))
             
         weighted_population = helper.weight (population)    
-        (local_best_ind, local_maximum_fitness) = helper.getBest(weighted_population)
+        (local_best_ind, local_maximum_weight, best_fitness) = helper.getBest(weighted_population)
         
-        if local_maximum_fitness > global_maximum_fitness:
+        if local_maximum_weight > global_maximum_weight:
             global_best_ind = local_best_ind
-            global_maximum_fitness = local_maximum_fitness
+            global_maximum_weight = local_maximum_weight
+            global_best_fitness = best_fitness
             best_generation = generation
             print ("new global best!")
             helper.draw (local_best_ind, images_path + str(generation))
+
     
         print ('Generation', generation)
 #        helper.print_weight (weighted_population)
 
-        print ("global best individual", best_generation, global_best_ind, global_maximum_fitness)
-        print ("local best individual", local_best_ind, local_maximum_fitness)
+        print ("global best individual", best_generation, global_best_ind, global_maximum_weight, global_best_fitness)
+        print ("local best individual", local_best_ind, local_maximum_weight, best_fitness)
             
         weight_total = sum((item[1] for item in weighted_population))
-        print ("Total fitness", weight_total)
+        print ("Total weight", weight_total)
 
-#        helper.draw (local_best_ind, generation, images_path)
+#        helper.fitness(local_best_ind,  image_path=images_path+'gen_'+str(generation))
