@@ -67,7 +67,7 @@ def modelingOneModel(model_path):
 #    g.muteDirect (g, c.dr, -0.1, 2000)
 #    g.muteDirect (g, c.dr, 0.16, 3500)
 #    g.muteOffset (g, c.dr, 0, 1000)
-    g.norm(1e+4)
+#    g.norm(1e+3)
     
     
 #    g.phase()
@@ -252,6 +252,7 @@ if __name__ == "__main__":
     
 #    #    # MUTE    
     g = c.readGather ()
+    g.norm(1e+3)
 #    g = model_FD.muteDirect (g, c.dr, -0.1, 2000)
 #    g = model_FD.muteDirect (g, c.dr, 0.16, 3500)
 #    g = model_FD.muteOffset (g, c.dr, 0, 1000)

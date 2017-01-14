@@ -411,9 +411,31 @@ class GA_helper ():
 
     def fitness(self, dna, image_path=None):
         if self.fd_rt == 0:
-            return self.__fitness_FD(dna, image_path)
+            fitness = self.__fitness_FD(dna, image_path)
         if self.fd_rt == 1:
-            return self.__fitness_RT(dna, image_path)
+            fitness = self.__fitness_RT(dna, image_path)
+        
+        info = {'fitness', fitness}
+
+#        wide_info = True
+        if wide_info:
+            tt = self.getTT_RT(dna);
+            rt_energy = calc_energy_RT (self.g, tt)
+            rt_semb = calc_semb_RT (self.g, tt)
+            
+            dna_m = self.getModel_FD(dna)
+            fd_energy, fd_entropy = calcEnergy_FD (self.c, dna_m, image_path=image_path)
+    #        fwi_misfit_energy = calcMisfitEnergy_FD (self.c, dna_m, self.g, image_path=image_path)
+            
+            info = {'fitness': fitness, 
+                    'rt_energy': rt_energy,
+                    'rt_semb': rt_semb,
+                    'fd_energy': fd_energy,
+                    'fd_entropy': fd_entropy,
+    #                'fwi_misfit_energy': fwi_misfit_energy
+                    }
+    
+        return fitness, info
                 
     def __fitness_RT(self, dna, image_path=None):
         tt = self.getTT_RT(dna);
@@ -459,11 +481,11 @@ class GA_helper ():
         # probabilities during the selection phase. Then, reset the population list
         # so we can repopulate it after selection.
         for individual in population:
-            fitness_val = self.fitness(individual)
+            fitness_val, info = self.fitness(individual)
 
             # Generate the (individual,fitness) pair, taking in account whether or
             # not we will accidently divide by zero.
-            pair = (individual, fitness_val, fitness_val)
+            pair = (individual, fitness_val, info)
 
             weighted_population.append(pair)
         return weighted_population
@@ -477,15 +499,15 @@ class GA_helper ():
         # so we can repopulate it after selection.
         for individual in population:
             max_weight = 100000000000000000
-            fitness_val = self.fitness(individual)
+            fitness_val, info = self.fitness(individual)
             
             
             # not we will accidently divide by zero.
             if fitness_val == 0:
-                pair = (individual, max_weight, fitness_val)
+                pair = (individual, max_weight, info)
             else:
                 assert (1.0/fitness_val<max_weight)
-                pair = (individual, 1.0/fitness_val, fitness_val)
+                pair = (individual, 1.0/fitness_val, info)
  
             weighted_population.append(pair)
         return weighted_population
