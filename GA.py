@@ -10,6 +10,7 @@ def generate1DModel (nx, nz, dx, dz, interfaces):
     import model_FD
     m = model_FD.model(nx, nz, dx, dz) 
    
+    # FIXME: there is bug here
     interface_num = 0
     current_v = interfaces[interface_num][1]
     next_z = interfaces[interface_num+1][0]
@@ -315,16 +316,16 @@ def round_z (v1):
     return round(v1/dv1)*dv1
     
 def random_v1(v1 = None):
-    return round_v(bound_random (v1, None, 1500, 5000))
+    return round_v(bound_random (v1, 1000, 1500, 5000))
   
 def random_v2(v2 = None):
-    return round_v(bound_random (v2, None, 1500, 5000))
+    return round_v(bound_random (v2, 1000, 1500, 5000))
     
 def random_z1(z1 = None):
-    return round_z(bound_random (z1, None, 50, 250)) # WARNINNG min depth 50m
+    return round_z(bound_random (z1, 50, 50, 250)) # WARNINNG min depth 50m
     
 def random_v(v1 = None):
-    return round_v(bound_random (v1, None, 1500, 5000))    
+    return round_v(bound_random (v1, 1000, 1500, 5000))    
     
 class GA_helper ():   
     
@@ -596,9 +597,9 @@ class GA_helperI1 (GA_helper):
         self.init(c,g,m)    
 
     def random_dna(self):
-        z1 = random_z1()
-        v1 = random_v1()
-        v2 = random_v2()
+        z1 = random_z1(125)
+        v1 = random_v1(2000)
+        v2 = random_v2(3500)
         
         dna = [z1, v1, v2]
         return dna
@@ -678,7 +679,7 @@ class GA_helperI2 (GA_helper):
         rand_m = self.empty_model()
         for i in range (rand_m.nx):
             for j in range (rand_m.nz):
-                rand_m.v[i][j] = self.random_v()
+                rand_m.v[i][j] = self.random_v(2500)
                     
         return numpy.reshape(rand_m.v,(rand_m.nx*rand_m.nz))
         

@@ -28,7 +28,7 @@ def modelingOneModel(model_path):
 #    c.snap = c.nt
 
     
-    vel = GA.generate1DModel (c.nx, c.nz, c.dh, c.dh, [[0, 2000],[125, 3500],[200, 3000]])
+    vel = GA.generate1DModel (c.nx, c.nz, c.dh, c.dh, [[0, 2000],[125, 3500]])
     
 #    vel.draw ('', model_path + 'vel_gen.png')    
     vel.writeToFile (c.vp_file)
@@ -281,25 +281,29 @@ if __name__ == "__main__":
     m.emptyModel(c.nx*c.dh/1000., 0.05, c.nz*c.dh/1000., 0.025, 0.025, 0.01)
     m.writeToFile(model_name)
     
+    images_path = c.path + 'GA_images_orhan_entropy/' 
+    if not os.path.exists(images_path):
+        os.makedirs(images_path)
+        
 #    #    # MUTE    
     g = c.readGather ()
-#	g.norm(1e+3)
+    g.norm(1e+3)
 
 	# agc
-    g.norm(1e+7)    
+    g.draw ('', images_path + 'orig.png')
+ 
+    g.norm(1e+4)    
     g= run_SU(['/home/cloudera/cwp/bin/suaddnoise', 'sn=10000'], g)
     g= run_SU(['/home/cloudera/cwp/bin/suattributes', 'mode=phase'], g)
-#    g= run_SU(['/home/cloudera/cwp/bin/sugain', 'agc=1', 'wagc=0.1'], g)
+#    g= run_SU(['/home/cloudera/cwp/bin/sugain', 'agc=1', 'wagc=0.05'], g)
 
-	# mute
-#    g = model_FD.muteDirect (g, c.dr, -0.1, 2000)
-#    g = model_FD.muteDirect (g, c.dr, 0.16, 3500)
+    # mute
+#    g.muteDirect (-0.1, 2000)
+    g.muteDirect (0.2, 3500, hyp = False)
 #    g = model_FD.muteOffset (g, c.dr, 0, 1000)
-	# draw
-#    g.draw ('', model_path + 'forward_gather.png', norm=None)
+
+    g.draw ('', images_path + 'forward_gather.png', norm=None)
 #    exit()
- 
-    # 3
 #    helper = GA.GA_helperI3 (c, g, m)
 #    correct_dna = [[0, 2000],[125, 3500],[200, 3000]]
 
@@ -307,8 +311,7 @@ if __name__ == "__main__":
     helper = GA.GA_helperI1 (c, g, m)
     correct_dna = [125, 2000, 3500]
 
-    helper.define_RT_semb()
-    images_path = c.path + 'GA_images/' 
-    
+    helper.define_RT_energy()
+
     GA.GA_run (helper, images_path, correct_dna,
-        pop_size = 20, generatoin_count = 30, mutation = 0.1)    
+        pop_size = 30, generatoin_count = 30, mutation = 0.1)    
