@@ -5,12 +5,82 @@ import os
 import subprocess
 import math
 
+import numpy as np
+#import math
+import matplotlib.pyplot as plot
+import mpl_toolkits.mplot3d.axes3d as axes3d
+
+def cube_marginals(cube, normalize=False):
+    c_fcn = np.max
+    #if normalize else np.sum
+    xy = c_fcn(cube, axis=0)
+    xz = c_fcn(cube, axis=1)
+    yz = c_fcn(cube, axis=2)
+    return(xy,xz,yz)
+
+def plotcube(cube,xl=None,yl=None,zl=None,normalize=False,plot_front=False,show=False,
+             x_label = 'X', 
+             y_label = 'Y',
+             z_label = 'Z',
+             figure_name=None):
+    """Use contourf to plot cube marginals"""
+    (Z,Y,X) = cube.shape
+    (xy,xz,yz) = cube_marginals(cube,normalize=normalize)
+    x = np.arange(X)
+    y = np.arange(Y)
+    z = np.arange(Z)
+    
+    if xl == None: xl = np.arange(X)
+    if yl == None: yl = np.arange(Y)
+    if zl == None: zl = np.arange(Z)
+
+    fig = plot.figure()
+    ax = fig.gca(projection='3d')
+
+#    print (x[None,:].repeat(Y,axis=0), y[:,None].repeat(X,axis=1), xy)
+#    print (x[None,:].repeat(Z,axis=0), xz, z[:,None].repeat(X,axis=1))
+#    print (yz, y[None,:].repeat(Z,axis=0), z[:,None].repeat(Y,axis=1))
+    
+    # draw edge marginal surfaces
+    offsets = (Z-1,Y-1,0) if plot_front else (0, 0, X-1)
+    cset = ax.contourf(x[None,:].repeat(Y,axis=0), y[:,None].repeat(X,axis=1), xy, zdir='z', offset=offsets[0], cmap=plot.cm.coolwarm, alpha=0.75)
+    cset = ax.contourf(x[None,:].repeat(Z,axis=0), xz, z[:,None].repeat(X,axis=1), zdir='y', offset=offsets[1], cmap=plot.cm.coolwarm, alpha=0.75)
+    cset = ax.contourf(yz, y[None,:].repeat(Z,axis=0), z[:,None].repeat(Y,axis=1), zdir='x', offset=offsets[2], cmap=plot.cm.coolwarm, alpha=0.75)
+
+    # draw wire cube to aid visualization
+    ax.plot([0,X-1,X-1,0,0],[0,0,Y-1,Y-1,0],[0,0,0,0,0],'k-')
+    ax.plot([0,X-1,X-1,0,0],[0,0,Y-1,Y-1,0],[Z-1,Z-1,Z-1,Z-1,Z-1],'k-')
+    ax.plot([0,0],[0,0],[0,Z-1],'k-')
+    ax.plot([X-1,X-1],[0,0],[0,Z-1],'k-')
+    ax.plot([X-1,X-1],[Y-1,Y-1],[0,Z-1],'k-')
+    ax.plot([0,0],[Y-1,Y-1],[0,Z-1],'k-')
+
+    ax.set_xlabel(x_label)
+    ax.set_ylabel(y_label)
+    ax.set_zlabel(z_label)
+    
+#    ax.set_xlim(x[0], x[len(x)-1])
+#    ax.set_ylim(y[0], y[len(y)-1])
+#    ax.set_zlim(z[0], z[len(z)-1])
+    plot.locator_params(axis='x',nbins=len(xl))
+    plot.locator_params(axis='y',nbins=len(yl))
+    plot.locator_params(axis='z',nbins=len(zl))
+    ax.set_xticklabels(xl)
+    ax.set_yticklabels(yl)
+    ax.set_zticklabels(zl)
+    ax.invert_zaxis()
+        
+    print ('figure_name plotcube', figure_name)
+    if figure_name != None:
+        fig.savefig(figure_name,bbox_inches='tight', dpi=100)
+        
+    if show:
+        plot.show()
 #
 def generate1DModel (nx, nz, dx, dz, interfaces):
     import model_FD
     m = model_FD.model(nx, nz, dx, dz) 
    
-    # FIXME: there is bug here
     interface_num = 0
     current_v = interfaces[interface_num][1]
     next_z = interfaces[interface_num+1][0]
@@ -93,17 +163,21 @@ def calcEnergy_FD (c, vel, image_path = None, area = 25, mask_pow=0):
 #    mask.draw ('', 'mask.png')
 
     total_power = 0
+    max_power = 0
     for i in range (final.nx):
         for j in range (final.nz):
             total_power += final.v[i][j]**2
+            max_power = max(max_power, final.v[i][j]**2)
 
-    #print ('total_power', total_power)
+#    print ('total_power', total_power)
+#    print ('max_power', max_power)
+    
     
     entropy = 0
     for i in range (final.nx):
         for j in range (final.nz):
             taper = mask.v[i][j]
-            p_norm = final.v[i][j]**2/total_power*taper
+            p_norm = final.v[i][j]**2/max_power*taper
             entropy += p_norm*math.log(p_norm)
             
     entropy = -entropy
@@ -123,7 +197,8 @@ def calcEnergy_FD (c, vel, image_path = None, area = 25, mask_pow=0):
         c.drawEnargyAtSource(image_path + '_energy_at_source.png')
         
         zoom = final.zoom(sx, sz, 250, 250)
-        zoom.draw ('zoom', figure_name = image_path + '_zoom.png', cmap = 'gray', norm = 1e-7)        
+#        zoom.draw ('zoom', figure_name = image_path + '_zoom.png', cmap = 'gray', norm = 1e-7)        
+        zoom.draw ('zoom', figure_name = image_path + '_zoom.png', cmap = 'gray')
     
             
     # detele scratch files
@@ -307,23 +382,12 @@ def bound_random(v, dv, v1, v2):
         
     return v+rv
   
-def round_v (v1):
-    dv1 = 10
+def round_v (v1, dv1 = 10):
     return round(v1/dv1)*dv1
 
-def round_z (v1):
-    dv1 = 5
+def round_z (v1, dv1 = 5):
     return round(v1/dv1)*dv1
-    
-def random_v1(v1 = None):
-    return round_v(bound_random (v1, 1000, 1500, 5000))
-  
-def random_v2(v2 = None):
-    return round_v(bound_random (v2, 1000, 1500, 5000))
-    
-def random_z1(z1 = None):
-    return round_z(bound_random (z1, 50, 50, 250)) # WARNINNG min depth 50m
-    
+        
 def random_v(v1 = None):
     return round_v(bound_random (v1, 1000, 1500, 5000))    
     
@@ -416,6 +480,9 @@ class GA_helper ():
         return tt        
 
     def fitness(self, dna, image_path=None):
+        return self.fitness_(dna, image_path)
+        
+    def fitness_(self, dna, image_path=None):
         if self.fd_rt == 0:
             fitness = self.__fitness_FD(dna, image_path)
         if self.fd_rt == 1:
@@ -546,7 +613,7 @@ class GA_helper ():
         
         tt = self.getTT_RT(individual)
         if tt!= None:
-            self.g.draw (tt = tt, figure_name = images_path +'_gather.png', norm=None)
+            self.g.draw (tt = tt, figure_name = images_path +'_gather.png')
   
 #     
     def crossover(self, dna1, dna2):
@@ -594,15 +661,77 @@ class GA_helper ():
 class GA_helperI1 (GA_helper):   
 
     def __init__(self, c, g, m):
-        self.init(c,g,m)    
+        self.init(c,g,m)
+        
+        self.start_v1 = 1500
+        self.end_v1 = 5000
+        self.dv1 = 10
+        self.start_v2 = 1500
+        self.end_v2 = 5000
+        self.dv2 = 10
+
+        self.start_z = 50
+        self.end_z = 250
+        self.dz = 5
+        
+        self.nv1 = int((self.end_v1 - self.start_v1)/self.dv1 + 1)
+        self.nv2 = int((self.end_v2 - self.start_v2)/self.dv2 + 1)
+        self.nz = int((self.end_z - self.start_z)/self.dz + 1)
+        
+        self.cube = numpy.zeros((self.nz, self.nv2, self.nv1))
+        
+        self.z = numpy.arange(self.start_z, self.end_z + self.dz, self.dz)
+        self.v1 = numpy.arange(self.start_v1, self.end_v1 + self.dv1, self.dv1)
+        self.v2 = numpy.arange(self.start_v2, self.end_v2 + self.dv2, self.dv2)
+        
+        
+    def random_v1(self,v1 = None):
+        return round_v(bound_random (v1, 1000, self.start_v1, self.end_v1), self.dv1)
+  
+    def random_v2(self,v2 = None):
+        return round_v(bound_random (v2, 1000, self.start_v2, self.end_v2), self.dv2)
+        
+    def random_z1(self,z1 = None):
+        return round_z(bound_random (z1, 50, self.start_z, self.end_z), self.dz)
+                       # WARNINNG min depth 50m
 
     def random_dna(self):
-        z1 = random_z1(125)
-        v1 = random_v1(2000)
-        v2 = random_v2(3500)
+        z1 = self.random_z1(125)
+        v1 = self.random_v1(2000)
+        v2 = self.random_v2(3500)
         
         dna = [z1, v1, v2]
         return dna
+
+    ## PROXY
+    def fitness(self, dna, image_path=None):            
+        z = dna[0]
+        v1 = dna[1]
+        v2 = dna[2]
+        z = int((z-self.start_z)/self.dz)
+        v1 = int((v1-self.start_v1)/self.dv1)
+        v2 = int((v2-self.start_v2)/self.dv2)
+        fitness_val = self.cube[z][v2][v1]
+        if fitness_val == 0:
+            fitness = self.fitness_(dna, image_path)
+            fitness_val = fitness[0]
+            self.cube[z][v2][v1] = fitness_val
+
+
+        if image_path != None:
+            figure_name__ = image_path+'cube.png'
+            
+            plotcube(self.cube, 
+                     self.v1,
+                     self.v2,
+                     self.z,
+                      x_label = 'V1',
+                      y_label = 'V2',
+                      z_label = 'Z',
+                      figure_name = figure_name__
+                      )
+            
+        return [fitness_val, {}]
         
     @staticmethod
     def fillModel1 (m, z1, v1, v2):  
@@ -647,15 +776,15 @@ class GA_helperI1 (GA_helper):
             if random.random() <= mutation_chance:
                 if c == 0:
 #                    prev = dna[c]
-                    dna[c] = random_z1(dna[c])
+                    dna[c] = self.random_z1(dna[c])
 #                    print ('mutate z1', prev, dna[c])
                 if c == 1:
 #                    prev = dna[c]
-                    dna[c] = random_v1(dna[c])
+                    dna[c] = self.random_v1(dna[c])
 #                    print ('mutate v1', prev, dna[c])
                 if c == 2:
 #                    prev = dna[c]
-                    dna[c] = random_v2(dna[c])
+                    dna[c] = self.random_v2(dna[c])
 #                    print ('mutate v2', prev, dna[c])
         
         return dna
@@ -750,7 +879,34 @@ class GA_helperI3 (GA_helper):
         for l in range(self.layer_count-1):
             dna.append([self.random_z(),random_v()])
         return self.sort_by_z(dna)
+
+    @staticmethod
+    def fillModel_RT (m, interfaces):
+        interface_num = 0
+        current_v = interfaces[interface_num][1]/1000.
+        next_z = interfaces[interface_num+1][0]/1000.
+        for k in range (m.nz()):
+            z = k*m.dz 
+            if z > next_z:
+                interface_num += 1
+                if interface_num < len (interfaces) -1:
+                    next_z = interfaces[interface_num+1][0]/1000.
+                else:
+                    next_z = 10000.
+                    
+                current_v = interfaces[interface_num][1]/1000.
+  
+            for i in range (m.nx()):
+                for j in range (m.ny()):
+                    m.v[i][j][k] = current_v
     
+        return m    
+    
+    def getModel_RT(self, dna):
+        m = copy.deepcopy(self.m)
+        dna_m = self.fillModel_RT(m, dna)
+        return dna_m
+
     def getModel_FD(self, dna):
 #        dna = self.sort_by_z(dna)
 #        print (dna)
@@ -768,6 +924,37 @@ class GA_helperI3 (GA_helper):
         dna = self.sort_by_z(dna)
 #        print ('mutate dna', dna)
         return dna
+
+    def crossover2(self, dna1, dna2):
+        child1 = []
+        child2 = []
+        for c in range(len(dna1)):
+            child_dna1 = []
+            child_dna2 = []
+            w = random.random()
+            if w < 0.5:
+                child_dna1.append(dna1[c][0])
+                child_dna2.append(dna2[c][0])
+            else:
+                child_dna1.append(dna2[c][0])
+                child_dna2.append(dna1[c][0])
+                
+            w = random.random()
+            if w < 0.5:
+                child_dna1.append(dna1[c][1])
+                child_dna2.append(dna2[c][1])
+            else:
+                child_dna1.append(dna2[c][1])
+                child_dna2.append(dna1[c][1])
+                
+            child1.append(child_dna1)
+            child2.append(child_dna2)
+            
+        child1 = self.sort_by_z(child1)
+        child2 = self.sort_by_z(child2)
+#        print ('cross parents', dna1, dna2)
+#        print ('cross childs', child1, child2)
+        return child1, child2
         
     def crossover(self, dna1, dna2):
         dna1, dna2 = self.crossover2(dna1, dna2)

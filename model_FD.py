@@ -321,6 +321,7 @@ class gather ():
         self.nt = nt
         self.dt = dt
         self.dh = dh
+        self.norm_ampl = None
         self.v = numpy.zeros ((ntr,nt))
         
     def readValues (self, filename): 
@@ -332,7 +333,7 @@ class gather ():
         array = numpy.reshape(self.v, self.ntr*self.nt)   
         array.astype('float32').tofile(filename)
         
-    def draw(self, label = '', figure_name = None, show=False, norm = 1e-7, cmap = 'gray', tt = None):    
+    def draw(self, label = '', figure_name = None, show=False, norm = None, cmap = 'gray', tt = None):    
         import matplotlib.pyplot as plt
         
         plt.rcParams['figure.figsize'] = 40, 30
@@ -344,6 +345,8 @@ class gather ():
         plt.ylabel('Time (s)')
         plt.xlabel('Trace')
         
+        if norm == None:
+            norm = self.norm_ampl
 #        print ('ntr', len(self.v), len(self.v[0]))
              
         label_t = [(i*self.dt*1000)/1000. for i in range(self.nt)]  
