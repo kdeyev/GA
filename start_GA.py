@@ -266,11 +266,11 @@ def testObjective (helper, correct_dna, figure_name=None):
     correct_fitness = helper.fitness(correct_dna)
     print ('correct', correct_dna, correct_fitness)
     
-    lz = 10
+    lz = 20
     dz = 5
     nz = lz/dz
     
-    lv1 = 50
+    lv1 = 100
     dv1 = 25
     nv1 = lv1/dv1
 
@@ -319,9 +319,9 @@ def prepare_gather(c, images_path, ):
 #    g.draw ('', images_path + 'orig.png')
     
     g.norm(1e+4)    
-#    g= run_SU(['/home/cloudera/cwp/bin/suaddnoise', 'sn=10000'], g)
-#    g= run_SU(['/home/cloudera/cwp/bin/suattributes', 'mode=phase'], g)
-    g= run_SU(['/home/cloudera/cwp/bin/sugain', 'agc=1', 'wagc=0.05'], g)
+    g= run_SU(['/home/cloudera/cwp/bin/suaddnoise', 'sn=10000'], g)
+    g= run_SU(['/home/cloudera/cwp/bin/suattributes', 'mode=phase'], g)
+#    g= run_SU(['/home/cloudera/cwp/bin/sugain', 'agc=1', 'wagc=0.05'], g)
 
     # mute
 ###    g.muteDirect (-0.1, 2000)
@@ -356,7 +356,7 @@ if __name__ == "__main__":
     m.emptyModel(c.nx*c.dh/1000., 0.05, c.nz*c.dh/1000., 0.025, 0.025, 0.01)
     m.writeToFile(model_name)
     
-    images_path = c.path + 'GA_images_evgeny_agc_energy/' 
+    images_path = c.path + 'GA_images_evgeny_phase_semb/' 
     if not os.path.exists(images_path):
         os.makedirs(images_path)
      
@@ -368,7 +368,7 @@ if __name__ == "__main__":
 #    helper = GA.GA_helperI3 (c, g, m)
 #    correct_dna = [[0., 2000.], [125., 3500.], [200., 4000.]]
 
-    helper.define_RT_energy()
+    helper.define_RT_semb()
 
     
     testObjective (helper, correct_dna, figure_name = images_path + 'testObjective.png')

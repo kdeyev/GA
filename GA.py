@@ -270,21 +270,39 @@ def calc_energy_RT (g, tt):
         
     return energy
     
-def calc_semb_RT (g, tt):
+def calc_semb_RT (g, tt, win=0.02):
     sum_ = 0
     sum_sq = 0
+    win_samp = int(win/g.dt/2)
+    sum_ = numpy.zeros((win_samp*2+1))
+    sum_sq = numpy.zeros((win_samp*2+1))
+    nn = numpy.zeros((win_samp*2+1))
     for i in range (g.ntr):
         j = int (tt[i]/g.dt)
-        if j < 0 or j >= g.nt:
-            continue
-        amp = g.v[j][i]
-        sum_ += amp
-        sum_sq += amp ** 2
-        
-    if sum_sq == 0:
-        return 0
-        
-    return (sum_**2)/(sum_sq*g.ntr)
+        for k in range(-win_samp, win_samp+1):
+            in_samp = j+k
+            if in_samp < 0 or in_samp >= g.nt:
+                continue
+            
+            out_samp = k + win_samp
+            amp = g.v[in_samp][i]
+            sum_[out_samp] += amp
+            sum_sq[out_samp] += amp**2
+            nn[out_samp] += 1
+         
+#    print ('sum_',sum_)
+#    print ('sum_sq',sum_sq)
+#    print ('nn',nn)
+    semb = numpy.zeros((win_samp*2+1))
+    for k in range(-win_samp, win_samp+1):
+        out_samp = k + win_samp
+        if sum_sq[out_samp] != 0:
+            semb[out_samp] = (sum_[out_samp]**2)/(sum_sq[out_samp]*nn[out_samp])
+            
+#    print ('semb',semb)
+    
+    aver_semb = numpy.average(semb)
+    return aver_semb
     
 def generateGeom_RT (xs, ys, nr, dx, dy):
     import geom_RT
