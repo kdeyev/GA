@@ -19,6 +19,7 @@ def modelingOneModel(model_path, model):
     
     c.nz = 50
     c.nu0 = 20 #Hz
+#    c.snap = 20
     c.snap = -1
     
         
@@ -65,15 +66,11 @@ def modelingOneModel(model_path, model):
 
 #    # MUTE    
     g = c.readGather ()
-#    g.muteDirect (g, c.dr, -0.1, 2000)
-#    g.muteDirect (g, c.dr, 0.16, 3500)
-#    g.muteOffset (g, c.dr, 0, 1000)
+    g.muteDirect (-0.1, 2000)
+    g.muteDirect (0.135, 3500, hyp = False)
+    g.muteOffset (0, 1000)
 #    g.norm(1e+3)
     
-    
-#    g.phase()
-#    
-
     new_nather_name = c.gather_file + '_mute'
     g.writeToFile (new_nather_name)    
     c.gather_file = new_nather_name
@@ -91,142 +88,6 @@ def modelingOneModel(model_path, model):
         subprocess.call(args, stdout=f)
         
     c.createImages ()
-
-#    
-#def modelingOneModelEvgeny(model_path):
-#        
-#    c = model_FD.config(model_path)    
-#    param_name = c.path + 'param_fw.txt'
-#    c.readFromFile(param_name)   
-##    c.absPath()
-#
-#
-##    vel.writeToFile (c.vp_file)
-##
-#    m = model_FD.model (c.nx, c.nz, c.dh, c.dh)
-#    m.readFromFile(c.vp_file)  
-##    print (m.v)
-##    exit ()
-#    rho = copy.deepcopy(m)
-#    rho.resetValues (1)
-#    # use vel as roh
-#    rho.writeToFile (c.rho_file)
-#    #    
-#    
-##    c.generateGeomFiles()
-#    
-#    c.wfl_file = param_name = c.path + 'snap_fw.bin'
-#    
-#    param_name = c.path + 'param_fw.txt'
-#    c.writeToFile(param_name)
-#    
-#    # command line args
-#    args = ['/home/cloudera/TRM/acoustic_FD_TRM/bin',
-#            param_name]
-#    
-##    log_name = c.path + 'log.txt'
-##    with open(log_name, 'w') as f:
-##        subprocess.call(args, stdout=f)
-##    c.createImages ()
-#    
-##    # MUTE    
-#    g = c.readGather ()
-##    refl + refr
-#    g.muteDirect (0.60, 9000, hyp=False, up = True)
-#    g.muteDirect (0.80, 2000, hyp=True)
-##    g.norm(1e+3)
-#    
-#    g.muteOffset (0, 1000)
-#
-##    refr
-#    g.muteDirect (0.65, 9000, hyp=False, up = True)
-#    g.muteDirect (0.60, 2000, hyp=True, up = False)
-##    g.norm(1e+2)
-#    g.draw ('', c.path + 'forward_gather_mute.png')
-#    exit ()
-#
-#
-#    new_nather_name = c.gather_file + '_mute'
-#    g.writeToFile (new_nather_name)    
-#    c.gather_file = new_nather_name
-#
-#    
-#    param_name = c.path + 'param_bw.txt'
-#    c.readFromFile(param_name)
-##    c.absPath()
-#    c.gather_file = new_nather_name
-#    c.writeToFile(param_name)
-#    
-#    # command line args
-#    args = ['/home/cloudera/TRM/acoustic_FD_TRM/bin',
-#            param_name]
-#    
-#    log_name = c.path + 'log.txt'
-#    with open(log_name, 'w') as f:
-#        subprocess.call(args, stdout=f)
-#        
-#    c.createImages ()
-#
-#def modelingOneModelEvgenyFullTRM(model_path):
-#        
-#    c = model_FD.config(model_path)    
-#    param_name = c.path + 'param_fw.txt'
-#    c.readFromFile(param_name)   
-#    c.absPath()
-#
-#
-##    vel.writeToFile (c.vp_file)
-##
-#    m = model_FD.model (c.nx, c.nz, c.dh, c.dh)
-#    m.readFromFile(c.vp_file)  
-##    print (m.v)
-##    exit ()
-#    rho = copy.deepcopy(m)
-#    rho.resetValues (1)
-#    # use vel as roh
-#    rho.writeToFile (c.rho_file)
-#    #    
-#    
-#    c.generateGeomFilesRoundModel()
-#    
-#    c.wfl_file = param_name = c.path + 'snap_fw.bin'
-#    
-#    param_name = c.path + 'param_fw_full_TRM.txt'
-#    c.writeToFile(param_name)
-#    
-#    # command line args
-#    args = ['/home/cloudera/TRM/acoustic_FD_TRM/bin',
-#            param_name]
-#    
-#    log_name = c.path + 'log.txt'
-#    with open(log_name, 'w') as f:
-#        subprocess.call(args, stdout=f)
-#    c.createImages ()
-#    
-#
-#    g = c.readGather ()
-#    g.norm(1e+1)
-#
-#    new_nather_name = c.gather_file + '_mute'
-#    g.writeToFile (new_nather_name)  
-#    
-##    param_name = c.path + 'param_bw.txt'
-##    c.readFromFile(param_name)
-##    c.absPath()
-#    c.back = 1
-#    c.gather_file = new_nather_name
-#    param_name = c.path + 'param_bw_full_TRM.txt'        
-#    c.writeToFile(param_name)
-#    
-#    # command line args
-#    args = ['/home/cloudera/TRM/acoustic_FD_TRM/bin',
-#            param_name]
-#    
-#    log_name = c.path + 'log.txt'
-#    with open(log_name, 'w') as f:
-#        subprocess.call(args, stdout=f)
-#        
-#    c.createImages ()
 
 def run_SU (args, g):
     import subprocess
@@ -261,6 +122,19 @@ def run_SU (args, g):
     
     return g
     
+def testEntropy (helper, figure_name):
+        
+    correct_dna = [125., 2000., 3500.]
+    fitness, info = helper.draw (correct_dna, images_path + 'correct')
+    print ('correct', info)
+
+    
+    wrong_dna = [130., 2680., 3340.]   
+    fitness, info = helper.draw (wrong_dna, images_path + 'wrong')
+    print ('wrong', info)
+    
+    exit ()
+ 
     
 def testObjective (helper, correct_dna, figure_name=None):
     correct_fitness = helper.fitness(correct_dna)
@@ -305,9 +179,45 @@ def testObjective (helper, correct_dna, figure_name=None):
               figure_name = figure_name)
     
 
-def prepare_gather(c, images_path, ):
-   
-#    
+
+
+def prepare_gather_mute_direct_offset(c, images_path ):
+    g = c.readGather ()
+    g.norm(1e+5)
+#    g.norm_ampl = 1e-03
+    
+    g.muteDirect (-0.1, 2000)
+    g.muteDirect (0.135, 3500, hyp = False)
+    g.muteOffset (0, 1000)
+    g.draw ('', images_path + 'forward_gather.png')
+    return g    
+    
+def prepare_gather_phase(c, images_path):
+    g = c.readGather ()
+    g.norm_ampl = None # autonorm
+#    g.draw ('', images_path + 'orig.png')
+    
+    g.norm(1e+4)    
+    g= run_SU(['/home/cloudera/cwp/bin/suaddnoise', 'sn=10000'], g)
+    g= run_SU(['/home/cloudera/cwp/bin/suattributes', 'mode=phase'], g)
+
+    g.muteDirect (0.135, 3500, hyp = False)
+    return g    
+
+def prepare_gather_agc(c, images_path):
+    g = c.readGather ()
+    g.norm_ampl = None # autonorm
+#    g.draw ('', images_path + 'orig.png')
+    
+    g.norm(1e+4)    
+    g= run_SU(['/home/cloudera/cwp/bin/sugain', 'agc=1', 'wagc=0.05'], g)
+
+    # mute
+    g.muteDirect (0.135, 3500, hyp = False)
+    return g    
+
+
+def prepare_gather(c, images_path): 
     g = c.readGather ()
 #    # fd
 #    g.norm(1e+7)
@@ -325,25 +235,24 @@ def prepare_gather(c, images_path, ):
 
     # mute
 ###    g.muteDirect (-0.1, 2000)
-    g.muteDirect (0.2, 3500, hyp = False)
+    g.muteDirect (0.135, 3500, hyp = False)
 ###    g = model_FD.muteOffset (g, c.dr, 0, 1000)
 
     # mute reflection
 #    g.muteDirect (0.05, 2000, hyp = True)
-#    g.muteDirect (0.15, 3500, hyp = False)
+#    g.muteDirect (0.135, 3500, hyp = False)
 #    g.draw ('', images_path + 'forward_gather.png')
 #    exit()
     return g    
 
+    
 if __name__ == "__main__":
-    model_path = '//home/cloudera/TRM/acoustic_FD_TRM/tests/orhan/'
+    model_path = '//home/cloudera/TRM/acoustic_FD_TRM/tests/evgeny/'
     if not os.path.exists(model_path):
         os.makedirs(model_path)
-        
-#    modelingOneModelEvgenyFullTRM(model_path)
-#    exit ()
 
-#    modelingOneModel(model_path, [[0, 2000], [125, 3500], [200, 4000]])
+#    modelingOneModel(model_path, [[0, 2000], [125, 3500]])
+#    exit ()
     
     import model_FD    
     c = model_FD.config(model_path)    
@@ -356,19 +265,27 @@ if __name__ == "__main__":
     m.emptyModel(c.nx*c.dh/1000., 0.05, c.nz*c.dh/1000., 0.025, 0.025, 0.01)
     m.writeToFile(model_name)
     
-    images_path = c.path + 'GA_images_evgeny_phase_semb/' 
+    images_path = c.path + 'GA_images_evgeny_entropy/' 
     if not os.path.exists(images_path):
         os.makedirs(images_path)
      
-    g = prepare_gather(c, images_path)
+#    g = prepare_gather(c, images_path)
+    g = prepare_gather_mute_direct_offset(c, images_path)
     
+    new_nather_name = c.gather_file + '_mute'
+    g.writeToFile (new_nather_name)    
+    c.gather_file = new_nather_name
         
     helper = GA.GA_helperI1 (c, g, m)
+    helper.define_FD_entropy()
+
+#    testEntropy (helper, images_path)
+#    exit ()
+    
     correct_dna = [125., 2000., 3500.]
+
 #    helper = GA.GA_helperI3 (c, g, m)
 #    correct_dna = [[0., 2000.], [125., 3500.], [200., 4000.]]
-
-    helper.define_RT_semb()
 
     
     testObjective (helper, correct_dna, figure_name = images_path + 'testObjective.png')

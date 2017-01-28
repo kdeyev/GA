@@ -98,9 +98,37 @@ def generate1DModel (nx, nz, dx, dz, interfaces):
             m.v[i][j] = current_v
 
     return m    
-        
+
+def calcEntropy_FD (final, sx, sz, area, image_path = None):
+
+    snap = final.zoom(sx, sz, area, area)
     
-def calcEnergy_FD (c, vel, image_path = None, area = 25, mask_pow=0):
+    
+    total_power = 0
+    max_power = 0
+    for i in range (snap.nx):
+        for j in range (snap.nz):
+            total_power += snap.v[i][j]**2
+            max_power = max(max_power, snap.v[i][j]**2)
+
+#    print ('total_power', total_power)
+#    print ('max_power', max_power)
+    
+    
+    entropy = 0
+    for i in range (snap.nx):
+        for j in range (snap.nz):
+            p_norm = snap.v[i][j]**2/max_power
+            entropy += p_norm*math.log(p_norm)
+            
+    entropy = -entropy
+    
+    if image_path != None:
+        snap.draw ('zoom', figure_name = image_path + '_zoom' + str (area) + '.png', cmap = 'gray')
+    
+    return entropy
+    
+def calcEnergy_FD (c, vel, image_path = None, area = 100, mask_pow=0):
     import model_FD
     
     assert (c.back == 1)
@@ -162,26 +190,6 @@ def calcEnergy_FD (c, vel, image_path = None, area = 25, mask_pow=0):
 
 #    mask.draw ('', 'mask.png')
 
-    total_power = 0
-    max_power = 0
-    for i in range (final.nx):
-        for j in range (final.nz):
-            total_power += final.v[i][j]**2
-            max_power = max(max_power, final.v[i][j]**2)
-
-#    print ('total_power', total_power)
-#    print ('max_power', max_power)
-    
-    
-    entropy = 0
-    for i in range (final.nx):
-        for j in range (final.nz):
-            taper = mask.v[i][j]
-            p_norm = final.v[i][j]**2/max_power*taper
-            entropy += p_norm*math.log(p_norm)
-            
-    entropy = -entropy
-    
     #take energy in source point
     energy = 0
     for i in range (mask.nx):
@@ -200,12 +208,34 @@ def calcEnergy_FD (c, vel, image_path = None, area = 25, mask_pow=0):
 #        zoom.draw ('zoom', figure_name = image_path + '_zoom.png', cmap = 'gray', norm = 1e-7)        
         zoom.draw ('zoom', figure_name = image_path + '_zoom.png', cmap = 'gray')
     
-            
+    entropy = calcEntropy_FD(final, sx, sz, area, image_path)
+    
+    entropy25 = calcEntropy_FD(final, sx, sz, 25, image_path)
+    entropy50 = calcEntropy_FD(final, sx, sz, 50, image_path)
+    entropy100 = calcEntropy_FD(final, sx, sz, 100, image_path)
+    entropy150 = calcEntropy_FD(final, sx, sz, 150, image_path)
+    entropy200 = calcEntropy_FD(final, sx, sz, 200, image_path)
+    entropy250 = calcEntropy_FD(final, sx, sz, 250, image_path)
+    
+    
+    info = {
+        'fd_energy': exact_energy,
+        'fd_entropy25': entropy25,
+        'fd_entropy50': entropy50,
+        'fd_entropy100': entropy100,
+        'fd_entropy150': entropy150,
+        'fd_entropy200': entropy200,
+        'fd_entropy250': entropy250,
+                    }
+                    
+#    print (image_path)
+#    print(info)
+        
     # detele scratch files
 #    import shutil    
 #    shutil.rmtree(test_name)
     
-    return exact_energy, entropy
+    return exact_energy, entropy, info
         
 def calcMisfitEnergy_FD (c, vel, g, image_path = None):
     assert (c.back == 0)
@@ -502,11 +532,18 @@ class GA_helper ():
         
     def fitness_(self, dna, image_path=None):
         if self.fd_rt == 0:
-            fitness = self.__fitness_FD(dna, image_path)
+            fitness, fd_info = self.__fitness_FD(dna, image_path)
         if self.fd_rt == 1:
             fitness = self.__fitness_RT(dna, image_path)
-        
-        info = {'fitness', fitness}
+            
+#        print ('fitness_ fd_info', fd_info)
+#        print (type(fd_info))
+#        
+#        info = {'fitness', fitness}
+#        print (type(info))
+#        info = {info.items() +  fd_info.items()}
+#        print ('fitness_', info)'
+        info = fd_info
 
         wide_info = False
         if wide_info:
@@ -515,16 +552,15 @@ class GA_helper ():
             rt_semb = calc_semb_RT (self.g, tt)
             
             dna_m = self.getModel_FD(dna)
-            fd_energy, fd_entropy = calcEnergy_FD (self.c, dna_m, image_path=image_path)
+            fd_energy, fd_info = calcEnergy_FD (self.c, dna_m, image_path=image_path)
     #        fwi_misfit_energy = calcMisfitEnergy_FD (self.c, dna_m, self.g, image_path=image_path)
             
             info = {'fitness': fitness, 
                     'rt_energy': rt_energy,
                     'rt_semb': rt_semb,
-                    'fd_energy': fd_energy,
-                    'fd_entropy': fd_entropy,
     #                'fwi_misfit_energy': fwi_misfit_energy
                     }
+            info = {info.items() +  fd_info.items()}
     
         return fitness, info
                 
@@ -538,11 +574,11 @@ class GA_helper ():
     def __fitness_FD(self, dna, image_path=None):
         dna_m = self.getModel_FD(dna)
         if self.fd_energy_entropy == 0 or self.fd_energy_entropy == 1:
-            energy, entropy = calcEnergy_FD (self.c, dna_m, image_path=image_path)
+            fitness, entropy, info  = calcEnergy_FD (self.c, dna_m, image_path=image_path)
             if self.fd_energy_entropy == 0:
-                return energy
+                return fitness, info
             if self.fd_energy_entropy == 1:
-                return entropy
+                return fitness, info
         if self.fd_energy_entropy == 2:
             return calcMisfitEnergy_FD (self.c, dna_m, self.g, image_path=image_path)
             
@@ -627,11 +663,13 @@ class GA_helper ():
     def draw (self, individual, images_path):
         #print ('individual',individual)
 #        dna_m = self.getModel_FD(individual)
-        self.fitness (individual, image_path=images_path)
+        fitness, info = self.fitness (individual, image_path=images_path)
         
         tt = self.getTT_RT(individual)
         if tt!= None:
             self.g.draw (tt = tt, figure_name = images_path +'_gather.png')
+            
+        return fitness, info 
   
 #     
     def crossover(self, dna1, dna2):
@@ -730,26 +768,27 @@ class GA_helperI1 (GA_helper):
         v1 = int((v1-self.start_v1)/self.dv1)
         v2 = int((v2-self.start_v2)/self.dv2)
         fitness_val = self.cube[z][v2][v1]
+        info = {}
         if fitness_val == 0:
-            fitness = self.fitness_(dna, image_path)
-            fitness_val = fitness[0]
+            fitness, info = self.fitness_(dna, image_path)
+            fitness_val = fitness
             self.cube[z][v2][v1] = fitness_val
 
 
-        if image_path != None:
-            figure_name__ = image_path+'cube.png'
-            
-            plotcube(self.cube, 
-                     self.v1,
-                     self.v2,
-                     self.z,
-                      x_label = 'V1',
-                      y_label = 'V2',
-                      z_label = 'Z',
-                      figure_name = figure_name__
-                      )
-            
-        return [fitness_val, {}]
+#        if image_path != None:
+#            figure_name__ = image_path+'cube.png'
+#            
+#            plotcube(self.cube, 
+#                     self.v1,
+#                     self.v2,
+#                     self.z,
+#                      x_label = 'V1',
+#                      y_label = 'V2',
+#                      z_label = 'Z',
+#                      figure_name = figure_name__
+#                      )
+#            
+        return fitness_val, info
         
     @staticmethod
     def fillModel1 (m, z1, v1, v2):  
