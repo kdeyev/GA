@@ -70,7 +70,7 @@ def plotcube(cube,xl=None,yl=None,zl=None,normalize=False,plot_front=False,show=
     ax.set_zticklabels(zl)
     ax.invert_zaxis()
         
-    print ('figure_name plotcube', figure_name)
+#    print ('figure_name plotcube', figure_name)
     if figure_name != None:
         fig.savefig(figure_name,bbox_inches='tight', dpi=100)
         
@@ -99,7 +99,7 @@ def generate1DModel (nx, nz, dx, dz, interfaces):
 
     return m    
 
-def calcEntropy_FD (final, sx, sz, area, image_path = None):
+def calcEntropy_FD (final, sx, sz, area, image_path = None, norm = None):
 
     snap = final.zoom(sx, sz, area, area)
     
@@ -123,8 +123,11 @@ def calcEntropy_FD (final, sx, sz, area, image_path = None):
             
     entropy = -entropy
     
+    # norm
+    entropy = entropy/(snap.nx*snap.nz)
+    
     if image_path != None:
-        snap.draw ('zoom', figure_name = image_path + '_zoom' + str (area) + '.png', cmap = 'gray')
+        snap.draw ('zoom', figure_name = image_path + '_zoom' + str (area) + '.png', cmap = 'gray', norm = norm)
     
     return entropy
     
@@ -198,28 +201,28 @@ def calcEnergy_FD (c, vel, image_path = None, area = 100, mask_pow=0):
             taper = mask.v[i][j]
             energy += e*taper
 #    
+    norm = 5e-7
     # just for test
     if image_path != None:
-        final.draw ('test', figure_name = image_path + '.png', cmap = 'gray', norm = 1e-7)        
+        final.draw ('test', figure_name = image_path + '.png', cmap = 'gray', norm = norm)        
         vel.draw ('', image_path +'_model.png', min_ = 1500, max_=5000)
         c.drawEnargyAtSource(image_path + '_energy_at_source.png')
         
         zoom = final.zoom(sx, sz, 250, 250)
-#        zoom.draw ('zoom', figure_name = image_path + '_zoom.png', cmap = 'gray', norm = 1e-7)        
-        zoom.draw ('zoom', figure_name = image_path + '_zoom.png', cmap = 'gray')
+        zoom.draw ('zoom', figure_name = image_path + '_zoom.png', cmap = 'gray', norm = norm)        
+        
+    entropy = calcEntropy_FD(final, sx, sz, area, image_path, norm = norm)
     
-    entropy = calcEntropy_FD(final, sx, sz, area, image_path)
-    
-    entropy25 = calcEntropy_FD(final, sx, sz, 25, image_path)
-    entropy50 = calcEntropy_FD(final, sx, sz, 50, image_path)
-    entropy100 = calcEntropy_FD(final, sx, sz, 100, image_path)
-    entropy150 = calcEntropy_FD(final, sx, sz, 150, image_path)
-    entropy200 = calcEntropy_FD(final, sx, sz, 200, image_path)
-    entropy250 = calcEntropy_FD(final, sx, sz, 250, image_path)
+    entropy25 = calcEntropy_FD(final, sx, sz, 25, image_path, norm = norm)
+    entropy50 = calcEntropy_FD(final, sx, sz, 50, image_path, norm = norm)
+    entropy100 = calcEntropy_FD(final, sx, sz, 100, image_path, norm = norm)
+    entropy150 = calcEntropy_FD(final, sx, sz, 150, image_path, norm = norm)
+    entropy200 = calcEntropy_FD(final, sx, sz, 200, image_path, norm = norm)
+    entropy250 = calcEntropy_FD(final, sx, sz, 250, image_path, norm = norm)
     
     
     info = {
-        'fd_energy': exact_energy,
+        'exact_energy': exact_energy,
         'fd_entropy25': entropy25,
         'fd_entropy50': entropy50,
         'fd_entropy100': entropy100,
@@ -289,7 +292,11 @@ def calcMisfitEnergy_FD (c, vel, g, image_path = None):
     
     return energy/norm_energy
 
-def calc_energy_RT (g, tt):
+def calc_energy_RT (g, tt, image_path=None):
+    g_nmo = nmo_RT (g, tt)
+    if image_path != None:
+        g_nmo.draw('nmo', figure_name = image_path + '_nmo.png', cmap = 'gray')        
+        
     energy = 0
     for i in range (g.ntr):
         j = int (tt[i]/g.dt)
@@ -300,34 +307,50 @@ def calc_energy_RT (g, tt):
         
     return energy
     
-def calc_semb_RT (g, tt, win=0.02):
-    sum_ = 0
-    sum_sq = 0
+
+def nmo_RT (g, tt, win=0.02):
     win_samp = int(win/g.dt/2)
-    sum_ = numpy.zeros((win_samp*2+1))
-    sum_sq = numpy.zeros((win_samp*2+1))
-    nn = numpy.zeros((win_samp*2+1))
+
+    import model_FD
+    g_nmo = model_FD.gather(g.ntr, win_samp*2+1, g.dt, g.dh)
+        
     for i in range (g.ntr):
         j = int (tt[i]/g.dt)
         for k in range(-win_samp, win_samp+1):
             in_samp = j+k
-            if in_samp < 0 or in_samp >= g.nt:
+            if in_samp < 0 or in_samp > g.nt:
                 continue
             
             out_samp = k + win_samp
-            amp = g.v[in_samp][i]
-            sum_[out_samp] += amp
-            sum_sq[out_samp] += amp**2
-            nn[out_samp] += 1
+            g_nmo.v[out_samp][i] = g.v[in_samp][i]
+
+    return g_nmo
+    
+def calc_semb_RT (g, tt, win=0.02, image_path=None):
+    g_nmo = nmo_RT (g, tt, win)
+    if image_path != None:
+        g_nmo.draw('NMO', figure_name = image_path + '_NMO.png', cmap = 'gray')
+        
+    sum_ = numpy.zeros((g_nmo.nt))
+    sum_sq = numpy.zeros((g_nmo.nt))
+    nn = numpy.zeros((g_nmo.nt))
+    for i in range (g_nmo.ntr):
+        for k in range(g_nmo.nt):
+            amp = g_nmo.v[k][i]
+            if amp == 0:
+                continue
+            
+            sum_[k] += amp
+            sum_sq[k] += amp**2
+            nn[k] += 1
          
 #    print ('sum_',sum_)
 #    print ('sum_sq',sum_sq)
 #    print ('nn',nn)
-    semb = numpy.zeros((win_samp*2+1))
-    for k in range(-win_samp, win_samp+1):
-        out_samp = k + win_samp
-        if sum_sq[out_samp] != 0:
-            semb[out_samp] = (sum_[out_samp]**2)/(sum_sq[out_samp]*nn[out_samp])
+    semb = numpy.zeros((g_nmo.nt))
+    for k in range(g_nmo.nt):
+        if sum_sq[k] != 0:
+            semb[k] = (sum_[k]**2)/(sum_sq[k]*nn[k])
             
 #    print ('semb',semb)
     
@@ -398,7 +421,92 @@ def calcTT_RT (m, geom_name, figure_name = None):
     
     return tt
     
+def calcTT_FMM_(vel, source_pos, image_path = None):
+    import numpy as np
+    import pylab as plt
+    import skfmm
+    
+    [six, siz] = vel.getIndex(source_pos[0], source_pos[1])
+    six = int (six)
+    siz = int (siz)
+    
+    assert (vel.dx == vel.dz)
+    dx = vel.dx
+      
+    phi = np.ones((vel.nx, vel.nz))
+    phi[six][siz] = -1
+#    print ('phi', phi)
+ 
+    speed = vel.v
 
+    dist = skfmm.distance(phi, dx)
+
+    tt = skfmm.travel_time(phi, speed, dx)
+
+    if image_path != None:
+        dist_t = np.transpose(dist)
+        phi_t = np.transpose(phi)
+        speed_t = np.transpose(speed) 
+        tt_t = np.transpose(tt)
+            
+        X, Z = np.meshgrid(np.linspace(-1,1,vel.nx), np.linspace(0,1,vel.nz))
+#        print ("X", X)
+#        print ("Z", Z)
+        
+        plt.subplot(221)
+        plt.title("Zero-contour of phi")
+        plt.contour(X, Z, phi_t, [0], colors='black', linewidths=(3))
+        #plt.gca().set_aspect(1)
+        plt.xticks([]); plt.yticks([])
+    
+            
+        plt.subplot(222)
+        plt.title("Distance")
+        plt.contour(X, Z, phi_t, [0], colors='black', linewidths=(3))
+        plt.contour(X, Z, dist_t , 15)
+        #plt.gca().set_aspect(1)
+        plt.xticks([]); plt.yticks([])
+        
+        plt.subplot(223)
+        plt.title("Vel")
+        plt.contour(X, Z, phi_t, [0], colors='black', linewidths=(3))
+        plt.contour(X, Z, speed_t , 15)
+        #plt.gca().set_aspect(1)
+        plt.xticks([]); plt.yticks([])
+        
+        plt.subplot(224)
+#        print (X[0])
+#        print (Z[0])
+#        print (tt[0])
+        plt.title("Travel time")
+        plt.contour(X, Z, phi_t, [0], colors='black', linewidths=(3))
+        plt.contour(X, Z, tt_t, 15)
+        #plt.gca().set_aspect(1)
+        plt.xticks([]); plt.yticks([])
+    
+#        plt.show()
+        plt.savefig(image_path + '_fmm.png',bbox_inches='tight', dpi=100)
+    
+    m_tt = copy.deepcopy(vel)
+    m_tt.v = tt
+    return m_tt
+    
+def calcTT_FMM (c, vel, image_path = None):
+    # take source position
+    [sx, sz] = c.getSourcePosition()
+    
+    #calc fast marching travel times
+    m_tt = calcTT_FMM_(vel, [sx, sz], image_path)
+
+    rec_pos = c.getRecPosition()
+    tt = []
+    for r in rec_pos:
+        t = m_tt.getValue(r[0], r[1])
+        tt.append(t)
+    
+    return tt
+
+    
 def weighted_choice(items):
   """
   Chooses a random element from items, where items is a list of tuples in
@@ -477,7 +585,15 @@ class GA_helper ():
 
     def define_RT_semb(self):
         self.fd_rt = 1
-        self.rt_energy_semb = 1          
+        self.rt_energy_semb = 1    
+        
+    def define_FMM_energy(self):
+        self.fd_rt = 2
+        self.rt_energy_semb = 0
+
+    def define_FMM_semb(self):
+        self.fd_rt = 2
+        self.rt_energy_semb = 1 
         
     def print_info (self):
         if self.fd_rt == 0:
@@ -494,6 +610,15 @@ class GA_helper ():
                 
         if self.fd_rt == 1:
             print ('Raytracing')
+            if self.rt_energy_semb == 0:
+                self.max_min = 0
+                print ('Energy')
+            if self.rt_energy_semb == 1:
+                print ('Semblance')
+                self.max_min = 0
+                
+        if self.fd_rt == 2:
+            print ('Fast Marching Method')
             if self.rt_energy_semb == 0:
                 self.max_min = 0
                 print ('Energy')
@@ -525,16 +650,27 @@ class GA_helper ():
         if dna_m == None:
             return None
         tt = calcTT_RT(dna_m, self.geom_name, figure_name)   
+        return tt       
+        
+    def getTT_FMM(self, dna, figure_name = None):
+        dna_m = self.getModel_FD(dna)
+        if dna_m == None:
+            return None
+        tt = calcTT_FMM(self.c, dna_m, figure_name)   
+#        print (tt)
         return tt        
 
     def fitness(self, dna, image_path=None):
         return self.fitness_(dna, image_path)
         
     def fitness_(self, dna, image_path=None):
+        fd_info = None
         if self.fd_rt == 0:
             fitness, fd_info = self.__fitness_FD(dna, image_path)
         if self.fd_rt == 1:
             fitness = self.__fitness_RT(dna, image_path)
+        if self.fd_rt == 2:
+            fitness = self.__fitness_FMM(dna, image_path)
             
 #        print ('fitness_ fd_info', fd_info)
 #        print (type(fd_info))
@@ -548,8 +684,12 @@ class GA_helper ():
         wide_info = False
         if wide_info:
             tt = self.getTT_RT(dna);
-            rt_energy = calc_energy_RT (self.g, tt)
-            rt_semb = calc_semb_RT (self.g, tt)
+            rt_energy = calc_energy_RT (self.g, tt, image_path)
+            rt_semb = calc_semb_RT (self.g, tt, image_path)
+
+            tt = self.getTT_FMM(dna);
+            fmm_energy = calc_energy_RT (self.g, tt, image_path)
+            fmm_semb = calc_semb_RT (self.g, tt, image_path)
             
             dna_m = self.getModel_FD(dna)
             fd_energy, fd_info = calcEnergy_FD (self.c, dna_m, image_path=image_path)
@@ -558,6 +698,8 @@ class GA_helper ():
             info = {'fitness': fitness, 
                     'rt_energy': rt_energy,
                     'rt_semb': rt_semb,
+                    'fmm_energy': fmm_energy,
+                    'fmm_semb': fmm_semb,
     #                'fwi_misfit_energy': fwi_misfit_energy
                     }
             info = {info.items() +  fd_info.items()}
@@ -567,10 +709,17 @@ class GA_helper ():
     def __fitness_RT(self, dna, image_path=None):
         tt = self.getTT_RT(dna);
         if self.rt_energy_semb == 0:
-            return calc_energy_RT (self.g, tt)
+            return calc_energy_RT (self.g, tt, image_path)
         if self.rt_energy_semb == 1:
-            return calc_semb_RT (self.g, tt)
+            return calc_semb_RT (self.g, tt, image_path)
 
+    def __fitness_FMM(self, dna, image_path=None):
+        tt = self.getTT_FMM(dna, image_path);
+        if self.rt_energy_semb == 0:
+            return calc_energy_RT (self.g, tt, image_path=image_path)
+        if self.rt_energy_semb == 1:
+            return calc_semb_RT (self.g, tt, image_path=image_path)
+            
     def __fitness_FD(self, dna, image_path=None):
         dna_m = self.getModel_FD(dna)
         if self.fd_energy_entropy == 0 or self.fd_energy_entropy == 1:
@@ -578,15 +727,17 @@ class GA_helper ():
             if self.fd_energy_entropy == 0:
                 return fitness, info
             if self.fd_energy_entropy == 1:
-                return fitness, info
+                return entropy, info
         if self.fd_energy_entropy == 2:
             return calcMisfitEnergy_FD (self.c, dna_m, self.g, image_path=image_path)
             
     def getModel(self, dna):
         if self.fd_rt == 0:
             return self.getModel_FD(dna)
-        if self.fd_rt == 0:
+        if self.fd_rt == 1:
             return self.getModel_RT(dna)
+        if self.fd_rt == 2:
+            return self.getModel_FD(dna)            
             
     def getModel_FD(self, dna):
         print ('getModel not implemented')
@@ -665,7 +816,7 @@ class GA_helper ():
 #        dna_m = self.getModel_FD(individual)
         fitness, info = self.fitness (individual, image_path=images_path)
         
-        tt = self.getTT_RT(individual)
+        tt = self.getTT_FMM(individual, images_path)
         if tt!= None:
             self.g.draw (tt = tt, figure_name = images_path +'_gather.png')
             
@@ -767,11 +918,14 @@ class GA_helperI1 (GA_helper):
         z = int((z-self.start_z)/self.dz)
         v1 = int((v1-self.start_v1)/self.dv1)
         v2 = int((v2-self.start_v2)/self.dv2)
-        fitness_val = self.cube[z][v2][v1]
-        info = {}
+
+        # TODO: need  to uncomment     fitness_val for optimization
+#        fitness_val = self.cube[z][v2][v1]
+        fitness_val = 0
+        
+        info = []
         if fitness_val == 0:
-            fitness, info = self.fitness_(dna, image_path)
-            fitness_val = fitness
+            fitness_val, info = self.fitness_(dna, image_path)
             self.cube[z][v2][v1] = fitness_val
 
 

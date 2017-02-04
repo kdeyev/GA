@@ -100,7 +100,7 @@ class model ():
         plt.rcParams['figure.figsize'] = 60, 15
 #        fig = plt.figure (figsize=(60, 15))
         fig = plt.figure()
-        plt.rc('font', family='serif', size=60)
+#        plt.rc('font', family='serif', size=60)
         ax = plt.subplot(111)
         ax.set_title(label)
         plt.ylabel('Depth (m)')
@@ -322,7 +322,7 @@ class gather ():
         self.dt = dt
         self.dh = dh
         self.norm_ampl = None
-        self.v = numpy.zeros ((ntr,nt))
+        self.v = numpy.zeros ((nt,ntr))
         
     def readValues (self, filename): 
         self.v = numpy.fromfile(filename, dtype=numpy.float32, count=self.ntr*self.nt)
@@ -339,7 +339,7 @@ class gather ():
         plt.rcParams['figure.figsize'] = 40, 30
 #        fig = plt.figure (figsize=(60, 15))
         fig = plt.figure()
-        plt.rc('font', family='serif', size=60)
+#        plt.rc('font', family='serif', size=60)
         ax = plt.subplot(111)
         ax.set_title(label)
         plt.ylabel('Time (s)')
@@ -783,7 +783,7 @@ class config ():
 
         plt.rcParams['figure.figsize'] = 40, 30
         plt.figure (figsize=(40, 30))
-        plt.rc('font', family='serif', size=60)
+#        plt.rc('font', family='serif', size=60)
         ax = plt.subplot(111)
 #        ax.set_title("Plan")
         plt.xlabel('Time (s)')
@@ -848,6 +848,17 @@ class config ():
         sz = float (l[1])
         
         return [sx, sz]
+
+    def getRecPosition (self):
+        f = open(self.rcv_file, 'r')
+        rec = []
+        for line in f:
+            k = line.split(' ')
+            x = float(k[0])
+            y = float(k[1])
+            rec.append([x,y])
+        return rec
+            
 #        
 #def muteDirect (g, dx, t0, v1) : 
 #    central_trace = (g.ntr)/2

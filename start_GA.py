@@ -66,9 +66,9 @@ def modelingOneModel(model_path, model):
 
 #    # MUTE    
     g = c.readGather ()
-    g.muteDirect (-0.1, 2000)
-    g.muteDirect (0.135, 3500, hyp = False)
-    g.muteOffset (0, 1000)
+#    g.muteDirect (-0.1, 2000)
+#    g.muteDirect (0.135, 3500, hyp = False)
+#    g.muteOffset (0, 1000)
 #    g.norm(1e+3)
     
     new_nather_name = c.gather_file + '_mute'
@@ -137,48 +137,69 @@ def testEntropy (helper, figure_name):
  
     
 def testObjective (helper, correct_dna, figure_name=None):
-    correct_fitness = helper.fitness(correct_dna)
-    print ('correct', correct_dna, correct_fitness)
+    correct_fitness, correct_info = helper.fitness(correct_dna)
+    print ('correct', correct_dna, correct_fitness, correct_info)
     
-    lz = 20
-    dz = 5
+    lz = 60
+    dz = 10
     nz = lz/dz
     
-    lv1 = 100
-    dv1 = 25
+    lv1 = 500
+    dv1 = 100
     nv1 = lv1/dv1
 
-    lv2 = 50
-    dv2 = 25
+    lv2 = 500
+    dv2 = 100
     nv2 = lv2/dv2
     
     import numpy
     cube = numpy.zeros((2*nz+1,2*nv2+1,2*nv1+1))
+    
+    
+    import copy
+    info_cubes = {}
+    for k in correct_info.keys():
+#        print (k)
+        info_cubes[k] = copy.deepcopy(cube)
+    
+    
     for z in range(-nz,nz+1):
         for v1 in range(-nv1,nv1+1):
             for v2 in range(-nv2,nv2+1):
                 dna = [correct_dna[0]+z*dz, correct_dna[1]+v1*dv1, correct_dna[2]+v2*dv2]
-                fitness = [0]
-                fitness = helper.fitness(dna)
-                cube[z+nz][v2+nv2][v1+nv1]=fitness[0]/correct_fitness[0]/2
-                if fitness > correct_fitness:
-                    print ('wrong', dna, fitness)
-                    
-#    cube[nz*2][v2+nv2][0]=1
+#                fitness = [0]
+                fitness, info = helper.fitness(dna)
+                cube[z+nz][v2+nv2][v1+nv1]=fitness/correct_fitness/2
     
+#                if fitness < correct_fitness:
+#                    print ('wrong', dna, fitness, info)
+    
+#                print(dna, info)
+                for k in correct_info.keys():
+                    correct_value = correct_info[k]
+                    value = info[k]
+                    c = info_cubes[k]
+                    c[z+nz][v2+nv2][v1+nv1]=value/correct_value/2
+
     z = numpy.arange(correct_dna[0]-nz*dz,correct_dna[0]+nz*dz + dz,dz)
-    print (z)
+#    print (z)
     v1 = numpy.arange(correct_dna[1]-nv1*dv1,correct_dna[1]+nv1*dv1 + dv1,dv1)
-    print (v1)
+#    print (v1)
     v2 = numpy.arange(correct_dna[2]-nv2*dv2,correct_dna[2]+nv2*dv2 + dv2,dv2)
-    print (v2)
+#    print (v2)
     GA.plotcube (cube,v1,v2,z,
               x_label = 'V1',
               y_label = 'V2',
               z_label = 'Z',
-              figure_name = figure_name)
+              figure_name = figure_name+'cube.png')
     
-
+    for k in info_cubes.keys():
+        c = info_cubes[k]
+        GA.plotcube (c,v1,v2,z,
+              x_label = 'V1',
+              y_label = 'V2',
+              z_label = 'Z',
+              figure_name = figure_name + k + '.png')
 
 
 def prepare_gather_mute_direct_offset(c, images_path ):
@@ -197,11 +218,13 @@ def prepare_gather_phase(c, images_path):
     g.norm_ampl = None # autonorm
 #    g.draw ('', images_path + 'orig.png')
     
+    g.muteDirect (0.135, 3500, hyp = False)
+    
     g.norm(1e+4)    
     g= run_SU(['/home/cloudera/cwp/bin/suaddnoise', 'sn=10000'], g)
     g= run_SU(['/home/cloudera/cwp/bin/suattributes', 'mode=phase'], g)
 
-    g.muteDirect (0.135, 3500, hyp = False)
+
     return g    
 
 def prepare_gather_agc(c, images_path):
@@ -265,19 +288,19 @@ if __name__ == "__main__":
     m.emptyModel(c.nx*c.dh/1000., 0.05, c.nz*c.dh/1000., 0.025, 0.025, 0.01)
     m.writeToFile(model_name)
     
-    images_path = c.path + 'GA_images_evgeny_entropy/' 
+    images_path = c.path + 'GA_images_evgeny_FMM/' 
     if not os.path.exists(images_path):
         os.makedirs(images_path)
      
-#    g = prepare_gather(c, images_path)
-    g = prepare_gather_mute_direct_offset(c, images_path)
+    g = prepare_gather_phase(c, images_path)
+#    g = prepare_gather_mute_direct_offset(c, images_path)
     
     new_nather_name = c.gather_file + '_mute'
     g.writeToFile (new_nather_name)    
     c.gather_file = new_nather_name
         
     helper = GA.GA_helperI1 (c, g, m)
-    helper.define_FD_entropy()
+    helper.define_FMM_semb()
 
 #    testEntropy (helper, images_path)
 #    exit ()
@@ -288,8 +311,8 @@ if __name__ == "__main__":
 #    correct_dna = [[0., 2000.], [125., 3500.], [200., 4000.]]
 
     
-    testObjective (helper, correct_dna, figure_name = images_path + 'testObjective.png')
-    exit ()
+#    testObjective (helper, correct_dna, figure_name = images_path)
+#    exit ()
     
     GA.GA_run (helper, images_path, correct_dna,
         pop_size = 20, generatoin_count = 100, mutation = 0.1)    
