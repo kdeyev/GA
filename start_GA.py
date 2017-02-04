@@ -232,11 +232,12 @@ def prepare_gather_agc(c, images_path):
     g.norm_ampl = None # autonorm
 #    g.draw ('', images_path + 'orig.png')
     
+    # mute
+    g.muteDirect (0.135, 3500, hyp = False)
+    
     g.norm(1e+4)    
     g= run_SU(['/home/cloudera/cwp/bin/sugain', 'agc=1', 'wagc=0.05'], g)
 
-    # mute
-    g.muteDirect (0.135, 3500, hyp = False)
     return g    
 
 
@@ -292,7 +293,7 @@ if __name__ == "__main__":
     if not os.path.exists(images_path):
         os.makedirs(images_path)
      
-    g = prepare_gather_phase(c, images_path)
+    g = prepare_gather_agc(c, images_path)
 #    g = prepare_gather_mute_direct_offset(c, images_path)
     
     new_nather_name = c.gather_file + '_mute'
@@ -300,7 +301,7 @@ if __name__ == "__main__":
     c.gather_file = new_nather_name
         
     helper = GA.GA_helperI1 (c, g, m)
-    helper.define_FMM_semb()
+    helper.define_FMM_energy()
 
 #    testEntropy (helper, images_path)
 #    exit ()

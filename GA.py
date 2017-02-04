@@ -290,23 +290,7 @@ def calcMisfitEnergy_FD (c, vel, g, image_path = None):
 #    import shutil    
 #    shutil.rmtree(test_name)
     
-    return energy/norm_energy
-
-def calc_energy_RT (g, tt, image_path=None):
-    g_nmo = nmo_RT (g, tt)
-    if image_path != None:
-        g_nmo.draw('nmo', figure_name = image_path + '_nmo.png', cmap = 'gray')        
-        
-    energy = 0
-    for i in range (g.ntr):
-        j = int (tt[i]/g.dt)
-        if j < 0 or j >= g.nt:
-            continue
-        amp = g.v[j][i]
-        energy += amp ** 2
-        
-    return energy
-    
+    return energy/norm_energy  
 
 def nmo_RT (g, tt, win=0.02):
     win_samp = int(win/g.dt/2)
@@ -326,7 +310,7 @@ def nmo_RT (g, tt, win=0.02):
 
     return g_nmo
     
-def calc_semb_RT (g, tt, win=0.02, image_path=None):
+def calc_semb_RT (g, tt, win=0.00, image_path=None):
     g_nmo = nmo_RT (g, tt, win)
     if image_path != None:
         g_nmo.draw('NMO', figure_name = image_path + '_NMO.png', cmap = 'gray')
@@ -356,6 +340,21 @@ def calc_semb_RT (g, tt, win=0.02, image_path=None):
     
     aver_semb = numpy.average(semb)
     return aver_semb
+
+def calc_energy_RT (g, tt, image_path=None):
+    g_nmo = nmo_RT (g, tt)
+    if image_path != None:
+        g_nmo.draw('nmo', figure_name = image_path + '_nmo.png', cmap = 'gray')        
+        
+    energy = 0
+    for i in range (g.ntr):
+        j = int (tt[i]/g.dt)
+        if j < 0 or j >= g.nt:
+            continue
+        amp = g.v[j][i]
+        energy += amp ** 2
+        
+    return energy
     
 def generateGeom_RT (xs, ys, nr, dx, dy):
     import geom_RT
