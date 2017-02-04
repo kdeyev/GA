@@ -106,8 +106,8 @@ class model ():
         plt.ylabel('Depth (m)')
         plt.xlabel('Location (m)')
              
-        label_x = self.x_nodes
-        label_z = self.z_nodes  
+        label_x = copy.deepcopy(self.x_nodes)
+        label_z = copy.deepcopy(self.z_nodes)
         for i in range(len(label_x)):
             if i%200 != 0:
                 label_x[i] = ""
@@ -567,7 +567,7 @@ class config ():
         self.gather_file = 'gather.bin'    # File to save the snapshots. size=nr*nt*n_snaps
 
         self.ns = 1
-        self.nr=500          # Number of geophones
+        self.nr=1001          # Number of geophones
 
         self.src_file= 'src.txt'     # Files that contain sources and geophones positions  
         self.rcv_file= 'rcv.txt'     # (see below their format)
@@ -723,7 +723,7 @@ class config ():
         f.write ('%s %s\n' % (5000, 0))
         
         f = open(self.rcv_file, 'w')
-        x_start = 2500
+        x_start = 0
         for i in range(self.nr):
             x = x_start + i * self.dr
             f.write ('%s %s\n' % (x, 0))

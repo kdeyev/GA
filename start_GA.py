@@ -314,13 +314,13 @@ if __name__ == "__main__":
     correct_dna = [[[100., 2000.], [125., 2500.], [100., 2000.]],
                    [[50., 3500.], [25., 3000.], [50., 3500.]]
                    ]
-    helper = GA.GA_helperI4 (c, g, m, len(correct_dna), len(correct_dna[0]))
+    helper = GA.GA_helperI4 (c, g, m, 0.01, True, len(correct_dna), len(correct_dna[0]))
 
                    
 #    modelingOneModel(model_path, helper.getModel_FD(correct_dna))
 #    exit ()
 
-    helper.define_FMM_energy()
+    helper.define_FMM_semb()
 
 #    testEntropy (helper, images_path)
 #    exit ()

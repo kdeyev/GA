@@ -283,7 +283,7 @@ def calcMisfitEnergy_FD (c, vel, g, image_path = None):
     if image_path != None:
         calc_g.draw ('test', figure_name = image_path + '_misfit.png', cmap = 'gray')        
         
-        vel.draw ('', image_path +'_model_FD.png')
+        vel.draw ('', image_path +'_model.png', min_ = 1500, max_=5000)
 
             
     # detele scratch files
@@ -292,28 +292,46 @@ def calcMisfitEnergy_FD (c, vel, g, image_path = None):
     
     return energy/norm_energy  
 
-def nmo_RT (g, tt, win=0.02):
+def nmo_RT (g, tt, win, fast):
     win_samp = int(win/g.dt/2)
 
     import model_FD
     g_nmo = model_FD.gather(g.ntr, win_samp*2+1, g.dt, g.dh)
-        
-    for i in range (g.ntr):
-        j = int (tt[i]/g.dt)
-        for k in range(-win_samp, win_samp+1):
-            in_samp = j+k
-            if in_samp < 0 or in_samp > g.nt:
-                continue
-            
-            out_samp = k + win_samp
-            g_nmo.v[out_samp][i] = g.v[in_samp][i]
 
-    return g_nmo
+    if fast:
+        for i in range (g.ntr):
+            j = int (tt[i]/g.dt)
+            for k in range(-win_samp, win_samp+1):
+                in_samp = j+k
+                if in_samp < 0 or in_samp > g.nt:
+                    continue
+	            
+                out_samp = k + win_samp
+                g_nmo.v[out_samp][i] = g.v[in_samp][i]
+	
+        return g_nmo
+    else:	
+        import scipy.interpolate        
+        v_t = numpy.transpose(g.v)
+        samples = [i for i in range(g.nt)]
+	
+        for i in range (g.ntr):
+            j = tt[i]/g.dt
+            interpolator = scipy.interpolate.interp1d(samples, v_t[i])
+            for k in range(-win_samp, win_samp+1):
+                in_samp = j+k           
+                if in_samp < 0 or in_samp >= g.nt:
+                    continue
+	            
+                out_samp = k + win_samp
+                g_nmo.v[out_samp][i] = interpolator(in_samp)
+	            
+        return g_nmo
     
-def calc_semb_RT (g, tt, win=0.00, image_path=None):
-    g_nmo = nmo_RT (g, tt, win)
+def calc_semb_RT (g, tt, win, fast, image_path=None):
+    g_nmo = nmo_RT (g, tt, win, fast)
     if image_path != None:
-        g_nmo.draw('NMO', figure_name = image_path + '_NMO.png', cmap = 'gray')
+        g_nmo.draw('NMO', figure_name = image_path + '_nmo.png', cmap = 'gray')
         
     sum_ = numpy.zeros((g_nmo.nt))
     sum_sq = numpy.zeros((g_nmo.nt))
@@ -321,12 +339,13 @@ def calc_semb_RT (g, tt, win=0.00, image_path=None):
     for i in range (g_nmo.ntr):
         for k in range(g_nmo.nt):
             amp = g_nmo.v[k][i]
+            nn[k] += 1
             if amp == 0:
                 continue
             
             sum_[k] += amp
             sum_sq[k] += amp**2
-            nn[k] += 1
+
          
 #    print ('sum_',sum_)
 #    print ('sum_sq',sum_sq)
@@ -341,18 +360,23 @@ def calc_semb_RT (g, tt, win=0.00, image_path=None):
     aver_semb = numpy.average(semb)
     return aver_semb
 
-def calc_energy_RT (g, tt, image_path=None):
-    g_nmo = nmo_RT (g, tt)
+def calc_energy_RT (g, tt, win, fast, image_path=None):
+    g_nmo = nmo_RT (g, tt, win, fast)
     if image_path != None:
         g_nmo.draw('nmo', figure_name = image_path + '_nmo.png', cmap = 'gray')        
         
     energy = 0
-    for i in range (g.ntr):
-        j = int (tt[i]/g.dt)
-        if j < 0 or j >= g.nt:
-            continue
-        amp = g.v[j][i]
-        energy += amp ** 2
+    for i in range (g_nmo.ntr):
+        for k in range(g_nmo.nt):
+            amp = g_nmo.v[k][i]
+            energy += amp ** 2
+            
+#    for i in range (g.ntr):
+#        j = int (tt[i]/g.dt)
+#        if j < 0 or j >= g.nt:
+#            continue
+#        amp = g.v[j][i]
+#        energy += amp ** 2
         
     return energy
     
@@ -443,69 +467,81 @@ def calcTT_FMM_(vel, source_pos, image_path = None):
     tt = skfmm.travel_time(phi, speed, dx)
 
     if image_path != None:
-        vel.draw ('', image_path +'_model_FD.png')
-        
-        dist_t = np.transpose(dist)
-        phi_t = np.transpose(phi)
-        speed_t = np.transpose(speed) 
-        tt_t = np.transpose(tt)
-            
-        X, Z = np.meshgrid(np.linspace(-1,1,vel.nx), np.linspace(0,1,vel.nz))
-#        print ("X", X)
-#        print ("Z", Z)
-        
-        plt.subplot(221)
-        plt.title("Zero-contour of phi")
-        plt.contour(X, Z, phi_t, [0], colors='black', linewidths=(3))
-        #plt.gca().set_aspect(1)
-        plt.xticks([]); plt.yticks([])
-    
-            
-        plt.subplot(222)
-        plt.title("Distance")
-        plt.contour(X, Z, phi_t, [0], colors='black', linewidths=(3))
-        plt.contour(X, Z, dist_t , 15)
-        #plt.gca().set_aspect(1)
-        plt.xticks([]); plt.yticks([])
-        
-        plt.subplot(223)
-        plt.title("Vel")
-        plt.contour(X, Z, phi_t, [0], colors='black', linewidths=(3))
-        plt.contour(X, Z, speed_t , 15)
-        #plt.gca().set_aspect(1)
-        plt.xticks([]); plt.yticks([])
-        
-        plt.subplot(224)
-#        print (X[0])
-#        print (Z[0])
-#        print (tt[0])
-        plt.title("Travel time")
-        plt.contour(X, Z, phi_t, [0], colors='black', linewidths=(3))
-        plt.contour(X, Z, tt_t, 15)
-        #plt.gca().set_aspect(1)
-        plt.xticks([]); plt.yticks([])
-    
-#        plt.show()
-        plt.savefig(image_path + '_fmm.png',bbox_inches='tight', dpi=100)
+        vel.draw ('', image_path +'_model.png', min_ = 1500, max_=5000)
+#        
+#        dist_t = np.transpose(dist)
+#        phi_t = np.transpose(phi)
+#        speed_t = np.transpose(speed) 
+#        tt_t = np.transpose(tt)
+#            
+#        X, Z = np.meshgrid(np.linspace(-1,1,vel.nx), np.linspace(0,1,vel.nz))
+##        print ("X", X)
+##        print ("Z", Z)
+#        
+#        plt.subplot(221)
+#        plt.title("Zero-contour of phi")
+#        plt.contour(X, Z, phi_t, [0], colors='black', linewidths=(3))
+#        #plt.gca().set_aspect(1)
+#        plt.xticks([]); plt.yticks([])
+#    
+#            
+#        plt.subplot(222)
+#        plt.title("Distance")
+#        plt.contour(X, Z, phi_t, [0], colors='black', linewidths=(3))
+#        plt.contour(X, Z, dist_t , 15)
+#        #plt.gca().set_aspect(1)
+#        plt.xticks([]); plt.yticks([])
+#        
+#        plt.subplot(223)
+#        plt.title("Vel")
+#        plt.contour(X, Z, phi_t, [0], colors='black', linewidths=(3))
+#        plt.contour(X, Z, speed_t , 15)
+#        #plt.gca().set_aspect(1)
+#        plt.xticks([]); plt.yticks([])
+#        
+#        plt.subplot(224)
+##        print (X[0])
+##        print (Z[0])
+##        print (tt[0])
+#        plt.title("Travel time")
+#        plt.contour(X, Z, phi_t, [0], colors='black', linewidths=(3))
+#        plt.contour(X, Z, tt_t, 15)
+#        #plt.gca().set_aspect(1)
+#        plt.xticks([]); plt.yticks([])
+#    
+##        plt.show()
+#        plt.savefig(image_path + '_fmm.png',bbox_inches='tight', dpi=100)
     
     m_tt = copy.deepcopy(vel)
     m_tt.v = tt
     return m_tt
     
-def calcTT_FMM (c, vel, image_path = None):
+def calcTT_FMM (c, vel, fast, image_path = None):
     # take source position
     [sx, sz] = c.getSourcePosition()
     
     #calc fast marching travel times
     m_tt = calcTT_FMM_(vel, [sx, sz], image_path)
-
-    rec_pos = c.getRecPosition()
-    tt = []
-    for r in rec_pos:
-        t = m_tt.getValue(r[0], r[1])
-        tt.append(t)
     
-    return tt
+    if fast:
+        rec_pos = c.getRecPosition()
+        tt = []
+        for r in rec_pos:
+            t = m_tt.getValue(r[0], r[1])
+            tt.append(t)
+	    
+        return tt
+    else:
+        interpolator = m_tt.getInterp()
+	        
+        rec_pos = c.getRecPosition()
+        tt = []
+        for r in rec_pos:
+	#        print(r)
+           t = interpolator(r)
+           tt.append(t)
+	    
+        return tt
 
     
 def weighted_choice(items):
@@ -550,10 +586,12 @@ def random_v(v1 = None):
     
 class GA_helper ():   
     
-    def init(self, c, g, m):
+    def init(self, c, g, m, win, fast):
         self.c = c
         self.g = g
         self.m = m
+        self.win = win
+        self.fast = fast
                 
         source_x = m.lx()/2
         source_y = m.ly()/2
@@ -657,7 +695,7 @@ class GA_helper ():
         dna_m = self.getModel_FD(dna)
         if dna_m == None:
             return None
-        tt = calcTT_FMM(self.c, dna_m, figure_name)   
+        tt = calcTT_FMM(self.c, dna_m, self.fast, figure_name)   
 #        print (tt)
         return tt        
 
@@ -685,12 +723,12 @@ class GA_helper ():
         wide_info = False
         if wide_info:
             tt = self.getTT_RT(dna);
-            rt_energy = calc_energy_RT (self.g, tt, image_path)
-            rt_semb = calc_semb_RT (self.g, tt, image_path)
+            rt_energy = calc_energy_RT (self.g, tt, self.win, self.fast, image_path)
+            rt_semb = calc_semb_RT (self.g, tt, self.win, self.fast, image_path)
 
             tt = self.getTT_FMM(dna, image_path);
-            fmm_energy = calc_energy_RT (self.g, tt, image_path)
-            fmm_semb = calc_semb_RT (self.g, tt, image_path)
+            fmm_energy = calc_energy_RT (self.g, tt,self.win, self.fast, image_path)
+            fmm_semb = calc_semb_RT (self.g, tt,self.win, self.fast, image_path)
             
             dna_m = self.getModel_FD(dna)
             fd_energy, fd_info = calcEnergy_FD (self.c, dna_m, image_path=image_path)
@@ -710,16 +748,16 @@ class GA_helper ():
     def __fitness_RT(self, dna, image_path=None):
         tt = self.getTT_RT(dna);
         if self.rt_energy_semb == 0:
-            return calc_energy_RT (self.g, tt, image_path)
+            return calc_energy_RT (self.g, tt, self.win, self.fast, image_path)
         if self.rt_energy_semb == 1:
-            return calc_semb_RT (self.g, tt, image_path)
+            return calc_semb_RT (self.g, tt, self.win, self.fast, image_path)
 
     def __fitness_FMM(self, dna, image_path=None):
         tt = self.getTT_FMM(dna, image_path);
         if self.rt_energy_semb == 0:
-            return calc_energy_RT (self.g, tt, image_path=image_path)
+            return calc_energy_RT (self.g, tt, self.win, self.fast, image_path=image_path)
         if self.rt_energy_semb == 1:
-            return calc_semb_RT (self.g, tt, image_path=image_path)
+            return calc_semb_RT (self.g, tt, self.win, self.fast, image_path=image_path)
             
     def __fitness_FD(self, dna, image_path=None):
         dna_m = self.getModel_FD(dna)
@@ -868,8 +906,8 @@ class GA_helper ():
            
 class GA_helperI1 (GA_helper):   
 
-    def __init__(self, c, g, m):
-        self.init(c,g,m)
+    def __init__(self, c, g, m, win, fast):
+        self.init(c,g,m, win,fast)
         
         self.start_v1 = 1500
         self.end_v1 = 5000
@@ -1003,8 +1041,8 @@ class GA_helperI1 (GA_helper):
     
 class GA_helperI2 (GA_helper):   
     
-    def __init__(self, c, g, m):
-        self.init(c, g, m)  
+    def __init__(self, c, g, m, win, fast):
+        self.init(c,g,m, win, fast)
 
     def empty_model (self):
         import model_FD
@@ -1066,8 +1104,8 @@ class GA_helperI2 (GA_helper):
 
 class GA_helperI3 (GA_helper):   
     
-    def __init__(self, c, g, m):
-        self.init(c, g, m)  
+    def __init__(self, c, g, m, win, fast):
+        self.init(c,g,m, win, fast)
         self.layer_count = 3
         
     def random_z(self, z1 = None):
@@ -1250,8 +1288,8 @@ class model_FMM (GA_helper):
         
 class GA_helperI4 (GA_helper):   
     
-    def __init__(self, c, g, m, nlayer, nx):
-        self.init(c, g, m) 
+    def __init__(self, c, g, m, win, fast, nlayer, nx ):
+        self.init(c, g, m, win, fast) 
         lx = self.c.nx*self.c.dh
         dx = lx/(nx-1)
         self.fmm_model = model_FMM(nlayer, nx, dx)
@@ -1342,6 +1380,21 @@ class GA_helperI4 (GA_helper):
                     else:
                         child1[i][j][c] = dna2[i][j][c]
                         child2[i][j][c] = dna1[i][j][c]
+
+        return child1, child2
+        
+    def crossover1(self, dna1, dna2):
+        child1 = copy.deepcopy(dna1)
+        child2 = copy.deepcopy(dna2)
+        for i in range(self.fmm_model.nlayer):
+            for j in range(self.fmm_model.nx):
+                w = random.random()
+                if w < 0.5:
+                    child1[i][j] = dna1[i][j]
+                    child2[i][j] = dna2[i][j]
+                else:
+                    child1[i][j] = dna2[i][j]
+                    child2[i][j] = dna1[i][j]
 
         return child1, child2
         
