@@ -11,7 +11,7 @@ import copy
 import subprocess
 
 
-def modelingOneModel(model_path, model):
+def modelingOneModel(model_path, vel):
     import model_FD
     
     c = model_FD.config(model_path)
@@ -29,7 +29,7 @@ def modelingOneModel(model_path, model):
 #    c.snap = c.nt
 
     
-    vel = GA.generate1DModel (c.nx, c.nz, c.dh, c.dh, model)
+#    vel = GA.generate1DModel (c.nx, c.nz, c.dh, c.dh, model)
     
     vel.draw ('', model_path + 'vel_gen.png')    
 #    exit ()
@@ -275,7 +275,11 @@ if __name__ == "__main__":
     if not os.path.exists(model_path):
         os.makedirs(model_path)
 
-#    modelingOneModel(model_path, [[0, 2000], [125, 3500]])
+#    helper = GA.GA_helperI4 (c, g, m, 2, 3)
+#    correct_dna = [[[100., 2000.], [125., 2500.], [100., 2000.]],
+#                   [[50., 3500.], [25., 3000.], [50., 3500.]]
+#                   ]
+#    modelingOneModel(model_path, helper.getModel_FD(correct_dna))
 #    exit ()
     
     import model_FD    
@@ -300,20 +304,31 @@ if __name__ == "__main__":
     g.writeToFile (new_nather_name)    
     c.gather_file = new_nather_name
         
-    helper = GA.GA_helperI1 (c, g, m)
+#    helper = GA.GA_helperI1 (c, g, m)
+#    correct_dna = [125., 2000., 3500.]
+
+#    helper = GA.GA_helperI3 (c, g, m)
+#    correct_dna = [[0., 2000.], [125., 3500.], [200., 4000.]]
+
+
+    correct_dna = [[[100., 2000.], [125., 2500.], [100., 2000.]],
+                   [[50., 3500.], [25., 3000.], [50., 3500.]]
+                   ]
+    helper = GA.GA_helperI4 (c, g, m, len(correct_dna), len(correct_dna[0]))
+
+                   
+#    modelingOneModel(model_path, helper.getModel_FD(correct_dna))
+#    exit ()
+
     helper.define_FMM_energy()
 
 #    testEntropy (helper, images_path)
 #    exit ()
     
-    correct_dna = [125., 2000., 3500.]
-
-#    helper = GA.GA_helperI3 (c, g, m)
-#    correct_dna = [[0., 2000.], [125., 3500.], [200., 4000.]]
 
     
 #    testObjective (helper, correct_dna, figure_name = images_path)
 #    exit ()
     
     GA.GA_run (helper, images_path, correct_dna,
-        pop_size = 20, generatoin_count = 100, mutation = 0.1)    
+        pop_size = 100, generatoin_count = 100, mutation = 0.1)    

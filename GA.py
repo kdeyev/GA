@@ -443,6 +443,8 @@ def calcTT_FMM_(vel, source_pos, image_path = None):
     tt = skfmm.travel_time(phi, speed, dx)
 
     if image_path != None:
+        vel.draw ('', image_path +'_model_FD.png')
+        
         dist_t = np.transpose(dist)
         phi_t = np.transpose(phi)
         speed_t = np.transpose(speed) 
@@ -686,7 +688,7 @@ class GA_helper ():
             rt_energy = calc_energy_RT (self.g, tt, image_path)
             rt_semb = calc_semb_RT (self.g, tt, image_path)
 
-            tt = self.getTT_FMM(dna);
+            tt = self.getTT_FMM(dna, image_path);
             fmm_energy = calc_energy_RT (self.g, tt, image_path)
             fmm_semb = calc_semb_RT (self.g, tt, image_path)
             
@@ -815,7 +817,7 @@ class GA_helper ():
 #        dna_m = self.getModel_FD(individual)
         fitness, info = self.fitness (individual, image_path=images_path)
         
-        tt = self.getTT_FMM(individual, images_path)
+        tt = self.getTT_FMM(individual)
         if tt!= None:
             self.g.draw (tt = tt, figure_name = images_path +'_gather.png')
             
@@ -1174,6 +1176,177 @@ class GA_helperI3 (GA_helper):
 #        print ('crossover dna2', dna2)
         
         return dna1, dna2
+        
+class model_FMM (GA_helper):   
+    def __init__(self, nlayer, nx, dx, sx=0, sz=0):
+        self.nx = nx
+        self.nlayer = nlayer
+        self.dx = dx
+        self.sx = sx
+        self.sz = sz
+        self.v = numpy.zeros ((nlayer, nx))
+        self.th = numpy.zeros ((nlayer,nx))
+        self.x_nodes = [i*self.dx + self.sx for i in range (self.nx)]
+
+    def prepareInterpolators (self):
+        import scipy.interpolate
+        self.interpolators_th = []
+        self.interpolators_v = []
+        for i in range (self.nlayer):  
+#            print ('x_nodes', self.x_nodes)
+#            print ('v', self.v[i])
+#            print ('th', self.th[i])
+            th = scipy.interpolate.interp1d(self.x_nodes, self.th[i])
+            v = scipy.interpolate.interp1d(self.x_nodes, self.v[i])
+            self.interpolators_th.append(th)
+            self.interpolators_v.append(v)
+            
+    def generateFDModel (self, m):         
+        self.prepareInterpolators()
+       
+        vv = []
+        thth = []
+        for i in range (self.nlayer):  
+            v = numpy.reshape(self.interpolators_v[i](m.x_nodes),(m.nx))
+#            print ('v', v)
+            vv.append(v)
+            
+            th = numpy.reshape(self.interpolators_th[i](m.x_nodes),(m.nx))
+#            print ('th', th)
+            thth.append(th)
+        
+        for i in range(m.nx):
+            layer_num = 0
+            
+            current_v = vv[layer_num][i]
+#            print ('current_v', current_v)
+            next_z = self.sz
+            th = thth[layer_num][i]
+#            print ('th', th)
+            next_z = next_z + th
+#            print ('next_z', next_z)
+            
+            for j in range (m.nz):                
+                z = j*m.dz
+#                print ('z', z)
+                if z > next_z:
+                    layer_num += 1
+                    th = 100000
+                    if layer_num < self.nlayer-1:
+                        th = thth[layer_num][i]
+#                        print ('th', th)
+                    next_z = next_z + th
+                        
+                    current_v = vv[layer_num][i]
+#                    print ('current_v', current_v)
+                    
+                m.v[i][j] = current_v
+    
+#        for i in range(m.nx): 
+#            for j in range (m.nz):  
+#                print (i*m.dx,j*m.dz ,m.v[i][j])
+                
+        return m    
+        
+class GA_helperI4 (GA_helper):   
+    
+    def __init__(self, c, g, m, nlayer, nx):
+        self.init(c, g, m) 
+        lx = self.c.nx*self.c.dh
+        dx = lx/(nx-1)
+        self.fmm_model = model_FMM(nlayer, nx, dx)
+        
+    def random_th(self, th1 = None):
+        lz = int(self.c.nz*self.c.dh)
+        default_th = int(lz/self.fmm_model.nlayer)
+        if th1 == None:
+            th1 = default_th
+        return round_z(bound_random (th1, None, 0, default_th))    
+        
+    def random_dna(self):
+        dna = []
+        for i in range(self.fmm_model.nlayer):
+            layer = []
+            for j in range(self.fmm_model.nx):
+                layer.append([self.random_th(),random_v()])
+            dna.append(layer)
+        return dna
+
+#    @staticmethod
+#    def fillModel_RT (m, interfaces):
+#        interface_num = 0
+#        current_v = interfaces[interface_num][1]/1000.
+#        next_z = interfaces[interface_num+1][0]/1000.
+#        for k in range (m.nz()):
+#            z = k*m.dz 
+#            if z > next_z:
+#                interface_num += 1
+#                if interface_num < len (interfaces) -1:
+#                    next_z = interfaces[interface_num+1][0]/1000.
+#                else:
+#                    next_z = 10000.
+#                    
+#                current_v = interfaces[interface_num][1]/1000.
+#  
+#            for i in range (m.nx()):
+#                for j in range (m.ny()):
+#                    m.v[i][j][k] = current_v
+#    
+#        return m    
+    
+#    def getModel_RT(self, dna):
+#        m = copy.deepcopy(self.m)
+#        dna_m = self.fillModel_RT(m, dna)
+#        return dna_m
+
+    def getModel_FD(self, dna):
+#        print ('dna',dna)
+        for i in range(self.fmm_model.nlayer):
+            for j in range(self.fmm_model.nx):
+                th = dna[i][j][0]
+                v = dna[i][j][1]
+
+                # TODO copy fmm_model!!!!
+                self.fmm_model.v[i][j] = v
+                self.fmm_model.th[i][j] = th
+
+#        print ('v',self.fmm_model.v)
+#        print ('th',self.fmm_model.th)
+
+        import model_FD
+        dna_m = model_FD.model(self.c.nx, self.c.nz, self.c.dh, self.c.dh) 
+        dna_m = self.fmm_model.generateFDModel(dna_m)
+#        print ('dna_m.v',dna_m.v)
+        return dna_m
+            
+    def mutate(self, dna, mutation_chance):        
+        for i in range(self.fmm_model.nlayer):
+            for j in range(self.fmm_model.nx):
+                 if random.random() <= mutation_chance:
+                     dna[i][j][0] = self.random_th(dna[i][j][0])
+                 if random.random() <= mutation_chance:
+                     dna[i][j][1] = random_v(dna[i][j][1])                
+               
+        return dna
+
+    def crossover2(self, dna1, dna2):
+        child1 = copy.deepcopy(dna1)
+        child2 = copy.deepcopy(dna2)
+        for i in range(self.fmm_model.nlayer):
+            for j in range(self.fmm_model.nx):
+                for c in range(len(dna1[i][j])):
+                    w = random.random()
+                    if w < 0.5:
+                        child1[i][j][c] = dna1[i][j][c]
+                        child2[i][j][c] = dna2[i][j][c]
+                    else:
+                        child1[i][j][c] = dna2[i][j][c]
+                        child2[i][j][c] = dna1[i][j][c]
+
+        return child1, child2
+        
+    def crossover(self, dna1, dna2):
+        return self.crossover2(dna1, dna2)
 
 #
 # Main driver
