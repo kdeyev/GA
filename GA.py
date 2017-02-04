@@ -303,7 +303,7 @@ def nmo_RT (g, tt, win, fast):
             j = int (tt[i]/g.dt)
             for k in range(-win_samp, win_samp+1):
                 in_samp = j+k
-                if in_samp < 0 or in_samp > g.nt:
+                if in_samp < 0 or in_samp >= g.nt:
                     continue
 	            
                 out_samp = k + win_samp
