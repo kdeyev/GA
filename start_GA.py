@@ -311,16 +311,16 @@ if __name__ == "__main__":
 #    correct_dna = [[0., 2000.], [125., 3500.], [200., 4000.]]
 
 
-    correct_dna = [[[100., 2000.], [125., 2500.], [100., 2000.]],
-                   [[50., 3500.], [25., 3000.], [50., 3500.]]
+    correct_dna = [[[50., 2000.], [50., 2000.], [25., 2000.], [50., 2500.], [50., 2500.], [50., 2000.]],
+                   [[50., 3500.], [50., 3500.], [75., 3500.], [50., 3500.], [50., 3500.], [50., 3500.]]
                    ]
-    helper = GA.GA_helperI4 (c, g, m, 0.01, True, len(correct_dna), len(correct_dna[0]))
+    helper = GA.GA_helperI4 (c, g, m, 0.00, True, len(correct_dna), len(correct_dna[0]))
 
                    
 #    modelingOneModel(model_path, helper.getModel_FD(correct_dna))
 #    exit ()
 
-    helper.define_FMM_semb()
+    helper.define_FMM_energy()
 
 #    testEntropy (helper, images_path)
 #    exit ()
@@ -331,4 +331,4 @@ if __name__ == "__main__":
 #    exit ()
     
     GA.GA_run (helper, images_path, correct_dna,
-        pop_size = 100, generatoin_count = 100, mutation = 0.1)    
+        pop_size = 300, generatoin_count = 100, mutation = 0.1)    

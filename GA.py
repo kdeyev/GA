@@ -298,6 +298,7 @@ def nmo_RT (g, tt, win, fast):
     import model_FD
     g_nmo = model_FD.gather(g.ntr, win_samp*2+1, g.dt, g.dh)
 
+    fast = False
     if fast:
         for i in range (g.ntr):
             j = int (tt[i]/g.dt)
@@ -320,7 +321,7 @@ def nmo_RT (g, tt, win, fast):
             interpolator = scipy.interpolate.interp1d(samples, v_t[i])
             for k in range(-win_samp, win_samp+1):
                 in_samp = j+k           
-                if in_samp < 0 or in_samp >= g.nt:
+                if in_samp < 0 or in_samp >= g.nt-1:
                     continue
 	            
                 out_samp = k + win_samp
@@ -328,7 +329,7 @@ def nmo_RT (g, tt, win, fast):
 	            
         return g_nmo
     
-def calc_semb_RT (g, tt, win, fast, image_path=None):
+def calc_fit_RT (g, tt, win, fast, image_path=None):
     g_nmo = nmo_RT (g, tt, win, fast)
     if image_path != None:
         g_nmo.draw('NMO', figure_name = image_path + '_nmo.png', cmap = 'gray')
@@ -336,9 +337,11 @@ def calc_semb_RT (g, tt, win, fast, image_path=None):
     sum_ = numpy.zeros((g_nmo.nt))
     sum_sq = numpy.zeros((g_nmo.nt))
     nn = numpy.zeros((g_nmo.nt))
+    energy = 0
     for i in range (g_nmo.ntr):
         for k in range(g_nmo.nt):
             amp = g_nmo.v[k][i]
+            energy += amp ** 2
             nn[k] += 1
             if amp == 0:
                 continue
@@ -358,28 +361,8 @@ def calc_semb_RT (g, tt, win, fast, image_path=None):
 #    print ('semb',semb)
     
     aver_semb = numpy.average(semb)
-    return aver_semb
+    return aver_semb, energy
 
-def calc_energy_RT (g, tt, win, fast, image_path=None):
-    g_nmo = nmo_RT (g, tt, win, fast)
-    if image_path != None:
-        g_nmo.draw('nmo', figure_name = image_path + '_nmo.png', cmap = 'gray')        
-        
-    energy = 0
-    for i in range (g_nmo.ntr):
-        for k in range(g_nmo.nt):
-            amp = g_nmo.v[k][i]
-            energy += amp ** 2
-            
-#    for i in range (g.ntr):
-#        j = int (tt[i]/g.dt)
-#        if j < 0 or j >= g.nt:
-#            continue
-#        amp = g.v[j][i]
-#        energy += amp ** 2
-        
-    return energy
-    
 def generateGeom_RT (xs, ys, nr, dx, dy):
     import geom_RT
     
@@ -723,12 +706,10 @@ class GA_helper ():
         wide_info = False
         if wide_info:
             tt = self.getTT_RT(dna);
-            rt_energy = calc_energy_RT (self.g, tt, self.win, self.fast, image_path)
-            rt_semb = calc_semb_RT (self.g, tt, self.win, self.fast, image_path)
+            rt_semb, rt_energy = calc_fit_RT (self.g, tt, self.win, self.fast, image_path)
 
             tt = self.getTT_FMM(dna, image_path);
-            fmm_energy = calc_energy_RT (self.g, tt,self.win, self.fast, image_path)
-            fmm_semb = calc_semb_RT (self.g, tt,self.win, self.fast, image_path)
+            fmm_semb, fmm_energy = calc_fit_RT (self.g, tt,self.win, self.fast, image_path)
             
             dna_m = self.getModel_FD(dna)
             fd_energy, fd_info = calcEnergy_FD (self.c, dna_m, image_path=image_path)
@@ -747,18 +728,20 @@ class GA_helper ():
                 
     def __fitness_RT(self, dna, image_path=None):
         tt = self.getTT_RT(dna);
+        semb, energy = calc_fit_RT (self.g, tt,self.win, self.fast, image_path)            
         if self.rt_energy_semb == 0:
-            return calc_energy_RT (self.g, tt, self.win, self.fast, image_path)
+            return energy
         if self.rt_energy_semb == 1:
-            return calc_semb_RT (self.g, tt, self.win, self.fast, image_path)
+            return semb
 
     def __fitness_FMM(self, dna, image_path=None):
         tt = self.getTT_FMM(dna, image_path);
+        semb, energy = calc_fit_RT (self.g, tt,self.win, self.fast, image_path)            
         if self.rt_energy_semb == 0:
-            return calc_energy_RT (self.g, tt, self.win, self.fast, image_path=image_path)
+            return energy
         if self.rt_energy_semb == 1:
-            return calc_semb_RT (self.g, tt, self.win, self.fast, image_path=image_path)
-            
+            return semb
+ 
     def __fitness_FD(self, dna, image_path=None):
         dna_m = self.getModel_FD(dna)
         if self.fd_energy_entropy == 0 or self.fd_energy_entropy == 1:
@@ -1234,8 +1217,8 @@ class model_FMM (GA_helper):
 #            print ('x_nodes', self.x_nodes)
 #            print ('v', self.v[i])
 #            print ('th', self.th[i])
-            th = scipy.interpolate.interp1d(self.x_nodes, self.th[i])
-            v = scipy.interpolate.interp1d(self.x_nodes, self.v[i])
+            th = scipy.interpolate.interp1d(self.x_nodes, self.th[i], kind='cubic')
+            v = scipy.interpolate.interp1d(self.x_nodes, self.v[i], kind='cubic')
             self.interpolators_th.append(th)
             self.interpolators_v.append(v)
             
