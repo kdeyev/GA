@@ -731,7 +731,7 @@ class GA_helper ():
             tt = self.getTT_RT(g, dna);
             gather_image_path = None
             if image_path != None and self.graw_gathers:
-                gather_image_path = image_path + '_' + str(shot)
+                gather_image_path = image_path + 'gather_' + str(shot)
             semb, energy = calc_fit_RT (g, tt,self.win, self.fast, gather_image_path)            
             if self.rt_energy_semb == 0:
                 fitness += energy
@@ -746,7 +746,7 @@ class GA_helper ():
             g = self.gathers[shot]
             gather_image_path = None
             if image_path != None and self.graw_gathers:
-                gather_image_path = image_path + '_' + str(shot)
+                gather_image_path = image_path + 'gather_' + str(shot)
             tt = self.getTT_FMM(g, dna_m);
             semb, energy = calc_fit_RT (g, tt,self.win, self.fast, gather_image_path)            
             if self.rt_energy_semb == 0:
@@ -860,7 +860,8 @@ class GA_helper ():
                 g = self.gathers[shot]
                 tt = self.getTT_FMM(g, dna_m)
                 if tt!= None:
-                    g.draw (tt = tt, figure_name = images_path +'_gather' + str(shot) + '.png')
+                    gather_image_path = images_path + 'gather_' + str(shot)
+                    g.draw (tt = tt, figure_name = gather_image_path + '.png')
                     
         return fitness, info 
   
@@ -1049,8 +1050,8 @@ class GA_helperI2 (GA_helper):
 
     def empty_model (self):
         import model_FD
-        lx = self.c.nx*self.c.dh
-        lz = self.c.nz*self.c.dh
+        lx = self.c.lx()
+        lz = self.c.lz()
         new_dx = 10001
         new_dz = 25
         
@@ -1112,7 +1113,7 @@ class GA_helperI3 (GA_helper):
         self.layer_count = 3
         
     def random_z(self, z1 = None):
-        lz = int(self.c.nz*self.c.dh)
+        lz = int(self.c.lz())
         if z1 == None:
             z1 = int(lz/2)
         return round_z(bound_random (z1, None, 0, lz))    
@@ -1293,12 +1294,12 @@ class GA_helperI4 (GA_helper):
     
     def __init__(self, c, gathers, m, win, fast, nlayer, nx ):
         self.init(c, gathers, m, win, fast) 
-        lx = self.c.nx*self.c.dh
+        lx = self.c.lx()
         dx = lx/(nx-1)
         self.fmm_model = model_FMM(nlayer, nx, dx)
         
     def random_th(self, th1 = None):
-        lz = int(self.c.nz*self.c.dh)
+        lz = int(self.c.lz())
         default_th = int(lz/self.fmm_model.nlayer)
         if th1 == None:
             th1 = default_th
@@ -1465,7 +1466,7 @@ def GA_run (helper, images_path, correct_dna,
             global_best_fitness = best_fitness
             best_generation = generation
             print ("new global best!")
-            helper.draw (local_best_ind, images_path + str(generation))
+            helper.draw (local_best_ind, images_path + 'iter_' + str(generation))
 
     
         print ('Generation', generation)

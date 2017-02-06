@@ -55,10 +55,10 @@ class model ():
                 self.v[i][j] = v
 
     def lx (self):
-        return self.sx + self.nx*self.dx
+        return self.sx + (self.nx-1)*self.dx
         
     def lz (self):
-        return self.sz + self.nz*self.dz
+        return self.sz + (self.nz-1)*self.dz
 
     def zoom (self, center_x, center_z, lx, lz):      
         center_x = int(center_x/self.dx)*self.dx
@@ -465,93 +465,93 @@ class snapShot ():
             self.spans[i].draw('', figure_name = filename, cmap = 'gray', norm=norm)
         
         
-
-def generateModel (nx, nz, dx, dz, modeltype):
-    m = model(nx, nz, dx, dz) 
-   
-#    m1 = int(modeltype)
-    
-    factor = 1
-#    factor = None
-#    if m1 == 0:
-#        factor = 1
-#    if m1 == 1:
-#        factor = 0.97
-#    if m1 == 2:
-#        factor = 1.03
-           
-#    print ('generateModel nx', m.nx)
-#    print ('generateModel nz', m.nz)
-        
-    if modeltype == 2:
-        for i in range (m.nx):
-            for j in range (m.nz):
-            
-                z = j*dz 
-                
-                if z <= 20:
-                    v = 2300
-                elif z <= 40:
-                    v = 2600
-                elif z <= 60:
-                    v = 2900
-                elif z <= 80:
-                    v = 3200
-                elif z <= 100:
-                    v = 3300
-                else:
-                    v = 3500
-                    
-                m.v[i][j] = v*factor
-        return m    
-        
-        
-    z1 = None
-    z2 = None
-    v1 = None
-    v2 = None
-    dv = None
-
-    if modeltype == 1:
-        z1 = 100
-        z2 = 125   
-        v1 = 2000
-        v2 = 3500
-
-    if modeltype == 3:
-        z1 = 00
-        z2 = 125
-        v1 = 2000
-        v2 = 3500
-        dv = (v2-v1)/(z2-z1)
-
-    if modeltype == 4:
-        z1 = 100
-        z2 = 125
-        v1 = 2000
-        v2 = 3500
-        dv = (v2-v1)/(z2-z1)
-
-    if modeltype == 5:
-        z1 = 0
-        z2 = 250
-        v1 = 2000
-        v2 = 2200
-        dv = (v2-v1)/(z2-z1)
-
-
-    for i in range (m.nx):
-        for j in range (m.nz):
-            z = j*dz 
-            v = v1
-            if dv != None and z >= z1 and z <= z2:
-                v = v1 + dv*(z-z1)
-            if (z > z2):
-                v = v2
-                
-            m.v[i][j] = v*factor
-    
-    return m    
+#
+#def generateModel (nx, nz, dx, dz, modeltype):
+#    m = model(nx, nz, dx, dz) 
+#   
+##    m1 = int(modeltype)
+#    
+#    factor = 1
+##    factor = None
+##    if m1 == 0:
+##        factor = 1
+##    if m1 == 1:
+##        factor = 0.97
+##    if m1 == 2:
+##        factor = 1.03
+#           
+##    print ('generateModel nx', m.nx)
+##    print ('generateModel nz', m.nz)
+#        
+#    if modeltype == 2:
+#        for i in range (m.nx):
+#            for j in range (m.nz):
+#            
+#                z = j*dz 
+#                
+#                if z <= 20:
+#                    v = 2300
+#                elif z <= 40:
+#                    v = 2600
+#                elif z <= 60:
+#                    v = 2900
+#                elif z <= 80:
+#                    v = 3200
+#                elif z <= 100:
+#                    v = 3300
+#                else:
+#                    v = 3500
+#                    
+#                m.v[i][j] = v*factor
+#        return m    
+#        
+#        
+#    z1 = None
+#    z2 = None
+#    v1 = None
+#    v2 = None
+#    dv = None
+#
+#    if modeltype == 1:
+#        z1 = 100
+#        z2 = 125   
+#        v1 = 2000
+#        v2 = 3500
+#
+#    if modeltype == 3:
+#        z1 = 00
+#        z2 = 125
+#        v1 = 2000
+#        v2 = 3500
+#        dv = (v2-v1)/(z2-z1)
+#
+#    if modeltype == 4:
+#        z1 = 100
+#        z2 = 125
+#        v1 = 2000
+#        v2 = 3500
+#        dv = (v2-v1)/(z2-z1)
+#
+#    if modeltype == 5:
+#        z1 = 0
+#        z2 = 250
+#        v1 = 2000
+#        v2 = 2200
+#        dv = (v2-v1)/(z2-z1)
+#
+#
+#    for i in range (m.nx):
+#        for j in range (m.nz):
+#            z = j*dz 
+#            v = v1
+#            if dv != None and z >= z1 and z <= z2:
+#                v = v1 + dv*(z-z1)
+#            if (z > z2):
+#                v = v2
+#                
+#            m.v[i][j] = v*factor
+#    
+#    return m    
 
 class config ():
     def __init__(self, path):
@@ -752,6 +752,12 @@ class config ():
 #        print (self._src_file)
 #        print (self._rcv_file)
 #        print (self.wfl_file)  
+
+    def lx(self):
+        return (self.nx-1)*self.dh
+
+    def lz(self):
+        return (self.nz-1)*self.dh
         
     def setCurrentShot(self, shot):
         self._src_file = self.g_src_file + '_' + str(shot)
@@ -762,10 +768,12 @@ class config ():
         self.setCurrentShot(shot)
         
         f = open(self._src_file, 'w')
-        lx = self.nx*self.dh
+        lx = self.lx()
+#        print ('lx', lx)
         xs = lx/2
         if (self.g_ns > 1):
             ds = lx/(self.g_ns-1)
+#            print ('ds', ds)
             xs = self.ox + ds*shot;
         f.write ('%s %s\n' % (xs, 0))
         
@@ -782,8 +790,8 @@ class config ():
     def generateGeomFilesRoundModel(self) :
 #        self._src_file = self._src_file
         self._rcv_file = self._rcv_file + '_round'
-        lx = (self.nx-1)*self.dh
-        lz = (self.nz-1)*self.dh
+        lx = self.lx()
+        lz = self.lz()
         sx = 0
         sz = 0
         

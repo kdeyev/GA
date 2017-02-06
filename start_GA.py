@@ -80,8 +80,8 @@ def modelingMultiGatherModel(model_path, vel):
 #        c.gather_file = new_nather_name
 #    
 #        
-#        param_name = c.path + 'param_bw.txt'
-#        c.writeToFile(param_name)
+    param_name = c.path + 'param_bw.txt'
+    c.writeToFile(param_name)
 
 def modelingOneModel(model_path, vel):
     import model_FD
@@ -374,7 +374,7 @@ if __name__ == "__main__":
     import model_RT
     model_name = 'model.txt'
     m = model_RT.VelModel() 
-    m.emptyModel(c.nx*c.dh/1000., 0.05, c.nz*c.dh/1000., 0.025, 0.025, 0.01)
+    m.emptyModel(c.lx()/1000., 0.05, c.lz()/1000., 0.025, 0.025, 0.01)
     m.writeToFile(model_name)
     
     images_path = c.path + 'GA_images_evgeny_FMM/' 
@@ -401,8 +401,8 @@ if __name__ == "__main__":
     helper = GA.GA_helperI4 (c, gathers, m, 0.01, True, len(correct_dna), len(correct_dna[0]))
 
                    
-    modelingMultiGatherModel(model_path, helper.getModel_FD(correct_dna))
-    exit ()
+#    modelingMultiGatherModel(model_path, helper.getModel_FD(correct_dna))
+#    exit ()
 
     helper.define_FMM_energy()
 
@@ -415,4 +415,4 @@ if __name__ == "__main__":
 #    exit ()
     
     GA.GA_run (helper, images_path, correct_dna,
-        pop_size = 100, generatoin_count = 100, mutation = 0.03)    
+        pop_size = 300, generatoin_count = 100, mutation = 0.03)    
