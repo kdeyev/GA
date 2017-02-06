@@ -315,14 +315,22 @@ class model ():
 #        plt.gcf().clear()
 
 class gather ():
-    def __init__ (self, ntr, nt, dt, dh):
+    def __init__ (self, nt, dt, dh, s_pos, rec_pos):
 #        print ('ntr', ntr)
-        self.ntr = ntr
+        self.ntr = len(rec_pos)
         self.nt = nt
         self.dt = dt
         self.dh = dh
         self.norm_ampl = None
-        self.v = numpy.zeros ((nt,ntr))
+        self.v = numpy.zeros ((nt,self.ntr))
+        self.s_pos = s_pos
+        self.rec_pos = rec_pos
+        
+    def sPos(self):
+        return self.s_pos
+        
+    def rPos(self):
+        return self.rec_pos
         
     def readValues (self, filename): 
         self.v = numpy.fromfile(filename, dtype=numpy.float32, count=self.ntr*self.nt)
@@ -381,10 +389,9 @@ class gather ():
         plt.gcf().clear()
             
     def muteDirect (self, t0, v1, hyp = True, up=False) : 
-        central_trace = (self.ntr)/2
         taper_samp = 20
         for i in range (self.ntr):
-            offset = float(abs(i-central_trace)*self.dh)
+            offset = abs(self.rec_pos[i][0] - self.s_pos[0])
             if hyp:
                 tmax = math.sqrt((offset / v1)**2 + t0**2)
             else:
@@ -409,9 +416,8 @@ class gather ():
         
 
     def muteOffset (self, o1, o2) : 
-        central_trace = (self.ntr)/2
         for i in range (self.ntr):
-            offset = float(abs(i-central_trace)*self.dh)
+            offset = abs(self.rec_pos[i][0] - self.s_pos[0])
             f = 1
             if offset >= o1 and offset <= o2:
                 f = 0
@@ -564,13 +570,13 @@ class config ():
         self.nt=1000         # Number of time samples in seismogram
         self.dt=0.002        # Time sampling in seismogram 
         self.nu0=20
-        self.gather_file = 'gather.bin'    # File to save the snapshots. size=nr*nt*n_snaps
+        self._gather_file = 'gather.bin'    # File to save the snapshots. size=nr*nt*n_snaps
 
-        self.ns = 1
-        self.nr=1001          # Number of geophones
+        self._ns = 1
+        self._nr=1001          # Number of geophones
 
-        self.src_file= 'src.txt'     # Files that contain sources and geophones positions  
-        self.rcv_file= 'rcv.txt'     # (see below their format)
+        self._src_file= 'src.txt'     # Files that contain sources and geophones positions  
+        self._rcv_file= 'rcv.txt'     # (see below their format)
 
         self.npml=50    # Size of PML layer in grid points
                         # (increase it to reduce artificial reflections, 
@@ -602,6 +608,13 @@ class config ():
                         # is stored in the file defined by "wfl=" at the last position (zero-time).
                         
         self.dr = 10
+        self.offset = 2500
+        
+        self.g_ns = 1
+        self.g_gather_file = 'gather.bin'    # File to save the snapshots. size=nr*nt*n_snaps
+        self.g_src_file= 'src.txt'     # Files that contain sources and geophones positions  
+        self.g_rcv_file= 'rcv.txt'     # (see below their format)
+
         
 #        self.absPath()
     
@@ -609,23 +622,23 @@ class config ():
     def absPath (self):
 #        print (self.vp_file)
 #        print (self.rho_file)
-#        print (self.gather_file)
-#        print (self.src_file)
-#        print (self.rcv_file)
+#        print (self._gather_file)
+#        print (self._src_file)
+#        print (self._rcv_file)
 #        print (self.wfl_file)  
 #        
         self.vp_file= self.path + self.vp_file
         self.rho_file=self.path + self.rho_file
-        self.gather_file = self.path + self.gather_file   
-        self.src_file= self.path + self.src_file
-        self.rcv_file= self.path + self.rcv_file 
+        self.g_gather_file = self.path + self.g_gather_file   
+        self.g_src_file= self.path + self.g_src_file
+        self.g_rcv_file= self.path + self.g_rcv_file 
         self.wfl_file = self.path + self.wfl_file
 #
 #        print (self.vp_file)
 #        print (self.rho_file)
-#        print (self.gather_file)
-#        print (self.src_file)
-#        print (self.rcv_file)
+#        print (self._gather_file)
+#        print (self._src_file)
+#        print (self._rcv_file)
 #        print (self.wfl_file)    
 
     
@@ -645,12 +658,12 @@ class config ():
         f.write ('nt=%s\n' % (self.nt))
         f.write ('dt=%s\n' % (self.dt))
         f.write ('nu0=%s\n' % (self.nu0))
-        f.write ('out=%s\n' % (self.gather_file))
+        f.write ('out=%s\n' % (self._gather_file))
         
-        f.write ('ns=%s\n' % (self.ns))
-        f.write ('nr=%s\n' % (self.nr))
-        f.write ('src=%s\n' % (self.src_file))
-        f.write ('rcv=%s\n' % (self.rcv_file))
+        f.write ('ns=%s\n' % (self._ns))
+        f.write ('nr=%s\n' % (self._nr))
+        f.write ('src=%s\n' % (self._src_file))
+        f.write ('rcv=%s\n' % (self._rcv_file))
         
         f.write ('npml=%s\n' % (self.npml))
         f.write ('damp=%s\n' % (self.damp))
@@ -664,7 +677,14 @@ class config ():
         f.write ('expl=%s\n' % (self.expl))
         f.write ('back=%s\n' % (self.back))        
         
-        f.write ('dr=%s\n' % (self.dr))        
+        f.write ('dr=%s\n' % (self.dr)) 
+        f.write ('offset=%s\n' % (self.offset)) 
+        
+        f.write ('g_ns=%s\n' % (self.g_ns)) 
+        f.write ('g_gather_file=%s\n' % (self.g_gather_file)) 
+        f.write ('g_src_file=%s\n' % (self.g_src_file)) 
+        f.write ('g_rcv_file=%s\n' % (self.g_rcv_file)) 
+        
 
     def readFromFile (self, filename):
         f = open(filename, 'r')
@@ -688,13 +708,13 @@ class config ():
         self.nt = int(d['nt'])
         self.dt = float(d['dt'])
         self.nu0 = float(d['nu0'])
-        self.gather_file = d['out'].rstrip()
+        self._gather_file = d['out'].rstrip()
 
 
-        self.ns = int(d['ns'])
-        self.nr = int(d['nr'])
-        self.src_file = d['src'].rstrip()
-        self.rcv_file = d['rcv'].rstrip()
+        self._ns = int(d['ns'])
+        self._nr = int(d['nr'])
+        self._src_file = d['src'].rstrip()
+        self._rcv_file = d['rcv'].rstrip()
 
         self.npml = float(d['npml'])
         self.damp = float(d['damp'])
@@ -710,27 +730,58 @@ class config ():
 
         if 'dr' in d:
             self.dr = float(d['dr'])
-#
+            
+        if 'offset' in d:
+            self.offset = float(d['offset'])
+            
+        if 'g_ns' in d:
+            self.g_ns = int(d['g_ns'])
+      
+        if 'g_gather_file' in d:
+            self.g_gather_file = d['g_gather_file'].rstrip()
+            
+        if 'g_src_file' in d:
+            self.g_src_file = d['g_src_file'].rstrip()
+            
+        if 'g_rcv_file' in d:
+            self.g_rcv_file = d['g_rcv_file'].rstrip()
+            
 #        print (self.vp_file)
 #        print (self.rho_file)
-#        print (self.gather_file)
-#        print (self.src_file)
-#        print (self.rcv_file)
+#        print (self._gather_file)
+#        print (self._src_file)
+#        print (self._rcv_file)
 #        print (self.wfl_file)  
         
-    def generateGeomFiles(self) : 
-        f = open(self.src_file, 'w')
-        f.write ('%s %s\n' % (5000, 0))
+    def setCurrentShot(self, shot):
+        self._src_file = self.g_src_file + '_' + str(shot)
+        self._rcv_file = self.g_rcv_file + '_' + str(shot)
+        self._gather_file = self.g_gather_file + '_' + str(shot)
         
-        f = open(self.rcv_file, 'w')
-        x_start = 0
-        for i in range(self.nr):
+    def generateGeomFiles(self, shot) : 
+        self.setCurrentShot(shot)
+        
+        f = open(self._src_file, 'w')
+        lx = self.nx*self.dh
+        xs = lx/2
+        if (self.g_ns > 1):
+            ds = lx/(self.g_ns-1)
+            xs = self.ox + ds*shot;
+        f.write ('%s %s\n' % (xs, 0))
+        
+        f = open(self._rcv_file, 'w')
+        x_start = xs - self.offset
+        x_end = xs + self.offset
+        x_start = max(x_start,self.ox)
+        x_end = min(x_end,lx)
+        self._nr = (x_end - x_start)/self.dr + 1
+        for i in range(self._nr):
             x = x_start + i * self.dr
             f.write ('%s %s\n' % (x, 0))
             
     def generateGeomFilesRoundModel(self) :
-#        self.src_file = self.src_file
-        self.rcv_file = self.rcv_file + '_round'
+#        self._src_file = self._src_file
+        self._rcv_file = self._rcv_file + '_round'
         lx = (self.nx-1)*self.dh
         lz = (self.nz-1)*self.dh
         sx = 0
@@ -739,47 +790,50 @@ class config ():
         f = open(self.src_file, 'w')
         f.write ('%s %s\n' % (lx/2, 0))
         
-        self.nr = 0
+        self._nr = 0
         
-        f = open(self.rcv_file, 'w')
+        f = open(self._rcv_file, 'w')
         
 #        for i in range(self.nx-1):
 #            x = sx + i * self.dh
 #            f.write ('%s %s\n' % (x, sz))
-#            self.nr  += 1
+#            self._nr  += 1
             
 #        for i in range(self.nx-1):
 #            x = sx + i * self.dh    
 #            f.write ('%s %s\n' % (x, lz))
-#            self.nr  += 1
+#            self._nr  += 1
 #            
         for j in range(self.nz-1):
             z = sz + j * self.dh
             f.write ('%s %s\n' % (sx, z))
-            self.nr  += 1
+            self._nr  += 1
             
         for j in range(self.nz-1):
             z = sz + j * self.dh
             f.write ('%s %s\n' % (lx, z))
-            self.nr  += 1
+            self._nr  += 1
             
     def generateGeomFilesEvgeny(self) : 
-        f = open(self.src_file, 'w')
+        f = open(self._src_file, 'w')
         f.write ('%s %s\n' % (self.nx*self.dh/2, 0))
         
-        f = open(self.rcv_file, 'w')
-        self.nr = self.nx
-        for i in range(self.nr):
+        f = open(self._rcv_file, 'w')
+        self._nr = self.nx
+        for i in range(self._nr):
             x = i * self.dh
             f.write ('%s %s\n' % (x, 0))
 
-    def readGather (self):
-        g = gather(self.nr, self.nt, self.dt, self.dr)
-        g.readValues (self.gather_file)
+    def readGather (self, shot):
+        self.setCurrentShot(shot)
+        
+            
+        g = gather(self.nt, self.dt, self.dr, self._getSourcePosition(), self._getRecPosition())
+        g.readValues (self._gather_file)
         return g
         
     def drawEnargyAtSource (self, figure_name):
-        en_on_source = numpy.fromfile(self.gather_file + '_s', dtype=numpy.float32)
+        en_on_source = numpy.fromfile(self._gather_file + '_s', dtype=numpy.float32)
 
         plt.rcParams['figure.figsize'] = 40, 30
         plt.figure (figsize=(40, 30))
@@ -831,17 +885,18 @@ class config ():
         final = snaps.spans[len(snaps.spans)-1]
         
         # take source position
-        [sx, sz] = self.getSourcePosition()
+#        [sx, sz] = self._getSourcePosition()
         
         if self.back == 1:
             final.draw ('test', figure_name = images_dir + 'final.png', cmap = 'gray', norm = 1e-7)               
-            zoom = final.zoom(sx, sz, 250, 250)
+            zoom = final.zoom(g.sx, g.sz, 250, 250)
             zoom.draw ('zoom', figure_name = images_dir + 'final_zoom.png', cmap = 'gray', norm = 1e-7)        
         
             
-    def getSourcePosition (self):
-        assert(self.ns == 1)
-        f = open(self.src_file, 'r')
+    def _getSourcePosition (self):
+        assert(self._ns == 1)
+#        print (self._src_file)
+        f = open(self._src_file, 'r')
         l = f.readline()
         l = l.split (" ")
         sx = float (l[0])
@@ -849,8 +904,8 @@ class config ():
         
         return [sx, sz]
 
-    def getRecPosition (self):
-        f = open(self.rcv_file, 'r')
+    def _getRecPosition (self):
+        f = open(self._rcv_file, 'r')
         rec = []
         for line in f:
             k = line.split(' ')
@@ -859,35 +914,6 @@ class config ():
             rec.append([x,y])
         return rec
             
-#        
-#def muteDirect (g, dx, t0, v1) : 
-#    central_trace = (g.ntr)/2
-#    taper_samp = 20
-#    for i in range (g.ntr):
-#        offset = float(abs(i-central_trace)*dx)
-#        tmax = offset / v1 + t0
-#        sampmax = int(tmax/g.dt)
-#        for j in range (sampmax, g.nt):
-#            f = 0
-#            if j-sampmax < taper_samp:
-#                f = 1-(j-sampmax)/float(taper_samp)
-##                print (f)
-#            g.v[j][i] *= f
-#    return g
-#    
-#    
-#def muteOffset (g, dx, o1, o2) : 
-#    central_trace = (g.ntr)/2
-#    for i in range (g.ntr):
-#        offset = float(abs(i-central_trace)*dx)
-#        f = 1
-#        if offset >= o1 and offset <= o2:
-#            f = 0
-#        for j in range (g.nt):
-#            g.v[j][i] *= f
-#    return g
-#
-#    
 #def modelingOneModel(c, model_type):
 #        
 ##    c = config(model_path)
@@ -940,9 +966,9 @@ class config ():
 #    g = muteOffset (g, c.dh, 0, 1000)
 ##    
 #
-#    new_nather_name = c.gather_file + '_mute'
+#    new_nather_name = c._gather_file + '_mute'
 #    g.writeToFile (new_nather_name)    
-#    c.gather_file = new_nather_name
+#    c._gather_file = new_nather_name
 #
 #    
 #    param_name = c.path + 'param_bw.txt'
@@ -1076,7 +1102,7 @@ class config ():
 #    final = snaps.spans[0]
 #    
 #    # take source position
-#    [sx, sz] = c.getSourcePosition()
+#    [sx, sz] = c._getSourcePosition()
 ##    print ('sx', sx, 'sz', sz)
 #    
 #    

@@ -10,6 +10,78 @@ import GA
 import copy
 import subprocess
 
+def modelingMultiGatherModel(model_path, vel):
+    import model_FD
+    
+    c = model_FD.config(model_path)
+    c.absPath()
+    
+    c.nz = 50
+    c.nu0 = 20 #Hz
+#    c.snap = 20
+    c.snap = -1
+    c.g_ns = 3
+    
+        
+    # enable PML
+#    c.free_surf = 0
+#    c.npml=3
+#    c.snap = c.nt
+
+    
+#    vel = GA.generate1DModel (c.nx, c.nz, c.dh, c.dh, model)
+    
+    vel.draw ('', model_path + 'vel_gen.png')    
+#    exit ()
+    vel.writeToFile (c.vp_file)
+
+    rho = copy.deepcopy(vel)
+    rho.resetValues (1)
+    # use vel as roh
+    rho.writeToFile (c.rho_file)
+    
+    gathers = []
+    for shot in range(c.g_ns):
+        c.generateGeomFiles(shot)
+        
+        c.wfl_file = param_name = c.path + 'snap_fw.bin'
+        
+        param_name = c.path + 'param_fw.txt'
+        c.writeToFile(param_name)
+        
+        # command line args
+        args = ['/home/cloudera/TRM/acoustic_FD_TRM/bin',
+                param_name]
+        
+        log_name = c.path + 'log.txt'
+        with open(log_name, 'w') as f:
+            subprocess.call(args, stdout=f)
+
+        g = c.readGather (shot)
+        
+        gathers.append(g)
+    
+#        c.back = 1
+#        # enable PML
+#    #    c.free_surf = 0
+#    #    c.npml=3
+#        
+#        c.wfl_file = param_name = c.path + 'snap_bw.bin'
+#    
+#    #    # MUTE    
+#        g = c.readGather (shot)
+#    #    g.muteDirect (-0.1, 2000)
+#    #    g.muteDirect (0.135, 3500, hyp = False)
+#    #    g.muteOffset (0, 1000)
+#    #    g.norm(1e+3)
+#        
+#        new_nather_name = c.gather_file + '_mute'
+#        g.writeToFile (new_nather_name)    
+#        c.gather_file = new_nather_name
+#    
+#        
+#        param_name = c.path + 'param_bw.txt'
+#        c.writeToFile(param_name)
 
 def modelingOneModel(model_path, vel):
     import model_FD
@@ -203,71 +275,83 @@ def testObjective (helper, correct_dna, figure_name=None):
 
 
 def prepare_gather_mute_direct_offset(c, images_path ):
-    g = c.readGather ()
-    g.norm(1e+5)
-#    g.norm_ampl = 1e-03
-    
-    g.muteDirect (-0.1, 2000)
-    g.muteDirect (0.135, 3500, hyp = False)
-    g.muteOffset (0, 1000)
-    g.draw ('', images_path + 'forward_gather.png')
-    return g    
-    
+    gathers = []
+    for shot in range(c.g_ns):
+        g = c.readGather (shot)
+        g.norm(1e+5)
+    #    g.norm_ampl = 1e-03
+        
+        g.muteDirect (-0.1, 2000)
+        g.muteDirect (0.135, 3500, hyp = False)
+        g.muteOffset (0, 1000)
+        g.draw ('', images_path + 'forward_gather.png')
+        gathers.append(g)    
+    return gathers      
+        
 def prepare_gather_phase(c, images_path):
-    g = c.readGather ()
-    g.norm_ampl = None # autonorm
-#    g.draw ('', images_path + 'orig.png')
-    
-    g.muteDirect (0.135, 3500, hyp = False)
-    
-    g.norm(1e+4)    
-    g= run_SU(['/home/cloudera/cwp/bin/suaddnoise', 'sn=10000'], g)
-    g= run_SU(['/home/cloudera/cwp/bin/suattributes', 'mode=phase'], g)
-
-
-    return g    
+    gathers = []
+    for shot in range(c.g_ns):
+        g = c.readGather (shot)
+        g.norm_ampl = None # autonorm
+    #    g.draw ('', images_path + 'orig.png')
+        
+        g.muteDirect (0.135, 3500, hyp = False)
+        
+        g.norm(1e+4)    
+        g= run_SU(['/home/cloudera/cwp/bin/suaddnoise', 'sn=10000'], g)
+        g= run_SU(['/home/cloudera/cwp/bin/suattributes', 'mode=phase'], g)        
+        gathers.append(g)    
+    return gathers      
 
 def prepare_gather_agc(c, images_path):
-    g = c.readGather ()
-    g.norm_ampl = None # autonorm
-#    g.draw ('', images_path + 'orig.png')
+    gathers = []
+    for shot in range(c.g_ns):
+        g = c.readGather (shot)
+        g.norm_ampl = None # autonorm
+    #    g.draw ('', images_path + 'orig.png')
+        
+        # mute
+        g.muteDirect (0.135, 3500, hyp = False)
+        
+        g.norm(1e+4)    
+        g= run_SU(['/home/cloudera/cwp/bin/sugain', 'agc=1', 'wagc=0.05'], g)
+        
+        gathers.append(g)
     
-    # mute
-    g.muteDirect (0.135, 3500, hyp = False)
-    
-    g.norm(1e+4)    
-    g= run_SU(['/home/cloudera/cwp/bin/sugain', 'agc=1', 'wagc=0.05'], g)
-
-    return g    
+    return gathers   
 
 
 def prepare_gather(c, images_path): 
-    g = c.readGather ()
-#    # fd
-#    g.norm(1e+7)
-#    g.norm_ampl = 1e-03
-
-#    #rt
-    # agc
-    g.norm_ampl = None # autonorm
-#    g.draw ('', images_path + 'orig.png')
+    gathers = []
+    for shot in range(c.g_ns):
+        g = c.readGather (shot)
     
-    g.norm(1e+4)    
-    g= run_SU(['/home/cloudera/cwp/bin/suaddnoise', 'sn=10000'], g)
-    g= run_SU(['/home/cloudera/cwp/bin/suattributes', 'mode=phase'], g)
-#    g= run_SU(['/home/cloudera/cwp/bin/sugain', 'agc=1', 'wagc=0.05'], g)
-
-    # mute
-###    g.muteDirect (-0.1, 2000)
-    g.muteDirect (0.135, 3500, hyp = False)
-###    g = model_FD.muteOffset (g, c.dr, 0, 1000)
-
-    # mute reflection
-#    g.muteDirect (0.05, 2000, hyp = True)
-#    g.muteDirect (0.135, 3500, hyp = False)
-#    g.draw ('', images_path + 'forward_gather.png')
-#    exit()
-    return g    
+    #    # fd
+    #    g.norm(1e+7)
+    #    g.norm_ampl = 1e-03
+    
+    #    #rt
+        # agc
+        g.norm_ampl = None # autonorm
+    #    g.draw ('', images_path + 'orig.png')
+        
+        g.norm(1e+4)    
+        g= run_SU(['/home/cloudera/cwp/bin/suaddnoise', 'sn=10000'], g)
+        g= run_SU(['/home/cloudera/cwp/bin/suattributes', 'mode=phase'], g)
+    #    g= run_SU(['/home/cloudera/cwp/bin/sugain', 'agc=1', 'wagc=0.05'], g)
+    
+        # mute
+    ###    g.muteDirect (-0.1, 2000)
+        g.muteDirect (0.135, 3500, hyp = False)
+    ###    g = model_FD.muteOffset (g, c.dr, 0, 1000)
+    
+        # mute reflection
+    #    g.muteDirect (0.05, 2000, hyp = True)
+    #    g.muteDirect (0.135, 3500, hyp = False)
+    #    g.draw ('', images_path + 'forward_gather.png')
+    #    exit()
+        gathers.append(g)
+    return gathers    
 
     
 if __name__ == "__main__":
@@ -297,12 +381,12 @@ if __name__ == "__main__":
     if not os.path.exists(images_path):
         os.makedirs(images_path)
      
-    g = prepare_gather_agc(c, images_path)
-#    g = prepare_gather_mute_direct_offset(c, images_path)
+    gathers = prepare_gather_agc(c, images_path)
+#    gathers = prepare_gather_mute_direct_offset(c, images_path)
     
-    new_nather_name = c.gather_file + '_mute'
-    g.writeToFile (new_nather_name)    
-    c.gather_file = new_nather_name
+#    new_nather_name = c.gather_file + '_mute'
+#    g.writeToFile (new_nather_name)    
+#    c.gather_file = new_nather_name
         
 #    helper = GA.GA_helperI1 (c, g, m)
 #    correct_dna = [125., 2000., 3500.]
@@ -314,11 +398,11 @@ if __name__ == "__main__":
     correct_dna = [[[50., 2000.], [50., 2000.], [25., 2000.], [50., 2500.], [50., 2500.], [50., 2000.]],
                    [[50., 3500.], [50., 3500.], [75., 3500.], [50., 3500.], [50., 3500.], [50., 3500.]]
                    ]
-    helper = GA.GA_helperI4 (c, g, m, 0.00, True, len(correct_dna), len(correct_dna[0]))
+    helper = GA.GA_helperI4 (c, gathers, m, 0.01, True, len(correct_dna), len(correct_dna[0]))
 
                    
-#    modelingOneModel(model_path, helper.getModel_FD(correct_dna))
-#    exit ()
+    modelingMultiGatherModel(model_path, helper.getModel_FD(correct_dna))
+    exit ()
 
     helper.define_FMM_energy()
 
@@ -331,4 +415,4 @@ if __name__ == "__main__":
 #    exit ()
     
     GA.GA_run (helper, images_path, correct_dna,
-        pop_size = 300, generatoin_count = 100, mutation = 0.1)    
+        pop_size = 100, generatoin_count = 100, mutation = 0.03)    

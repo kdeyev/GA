@@ -166,7 +166,7 @@ def calcEnergy_FD (c, vel, image_path = None, area = 100, mask_pow=0):
     final = snaps.spans[0]
     
     # take source position
-    [sx, sz] = c.getSourcePosition()
+    [sx, sz] = g.sPos()
 #    print ('sx', sx, 'sz', sz)
     
     
@@ -240,65 +240,65 @@ def calcEnergy_FD (c, vel, image_path = None, area = 100, mask_pow=0):
     
     return exact_energy, entropy, info
         
-def calcMisfitEnergy_FD (c, vel, g, image_path = None):
-    assert (c.back == 0)
-    assert (c.snap == 0)
-
-    test_name = c.path + 'tests/'
-    if not os.path.exists(test_name):
-        os.makedirs(test_name)
-            
-    c.vp_file = test_name + 'vel.bin'
-    c.wfl_file = test_name + 'snaps.bin'
-    c.gather_file = test_name + 'gather.bin'
-    param_name = test_name + 'param_bw.txt'
-    
-    # write model
-    vel.writeToFile (c.vp_file)
-
-    # TODO optimize me
-    c.writeToFile(param_name)   
-    
-    # command line args
-    args = ['/home/cloudera/TRM/acoustic_FD_TRM/bin',
-            param_name]
-    
-    FNULL = open(os.devnull, 'w')
-    subprocess.call(args, stdout=FNULL, stderr=subprocess.STDOUT)
-        
-    calc_g = c.readGather ()
-    
-    if image_path != None:
-        calc_g.draw ('test', figure_name = image_path + '_calc.png', cmap = 'gray')        
-  
-    norm_energy = 0
-    energy = 0
-    for i in range (g.ntr):
-        for j in range (g.nt):
-            norm_energy += g.v[j][i] **2
-            calc_g.v[j][i] -= g.v[j][i] 
-            energy += calc_g.v[j][i]**2
-    
-    # just for test
-    if image_path != None:
-        calc_g.draw ('test', figure_name = image_path + '_misfit.png', cmap = 'gray')        
-        
-        vel.draw ('', image_path +'_model.png', min_ = 1500, max_=5000)
-
-            
-    # detele scratch files
-#    import shutil    
-#    shutil.rmtree(test_name)
-    
-    return energy/norm_energy  
+#def calcMisfitEnergy_FD (c, vel, g, image_path = None):
+#    assert (c.back == 0)
+#    assert (c.snap == 0)
+#
+#    test_name = c.path + 'tests/'
+#    if not os.path.exists(test_name):
+#        os.makedirs(test_name)
+#            
+#    c.vp_file = test_name + 'vel.bin'
+#    c.wfl_file = test_name + 'snaps.bin'
+#    c.gather_file = test_name + 'gather.bin'
+#    param_name = test_name + 'param_bw.txt'
+#    
+#    # write model
+#    vel.writeToFile (c.vp_file)
+#
+#    # TODO optimize me
+#    c.writeToFile(param_name)   
+#    
+#    # command line args
+#    args = ['/home/cloudera/TRM/acoustic_FD_TRM/bin',
+#            param_name]
+#    
+#    FNULL = open(os.devnull, 'w')
+#    subprocess.call(args, stdout=FNULL, stderr=subprocess.STDOUT)
+#        
+#    calc_g = c.readGather ()
+#    
+#    if image_path != None:
+#        calc_g.draw ('test', figure_name = image_path + '_calc.png', cmap = 'gray')        
+#  
+#    norm_energy = 0
+#    energy = 0
+#    for i in range (g.ntr):
+#        for j in range (g.nt):
+#            norm_energy += g.v[j][i] **2
+#            calc_g.v[j][i] -= g.v[j][i] 
+#            energy += calc_g.v[j][i]**2
+#    
+#    # just for test
+#    if image_path != None:
+#        calc_g.draw ('test', figure_name = image_path + '_misfit.png', cmap = 'gray')        
+#        
+#        vel.draw ('', image_path +'_model.png', min_ = 1500, max_=5000)
+#
+#            
+#    # detele scratch files
+##    import shutil    
+##    shutil.rmtree(test_name)
+#    
+#    return energy/norm_energy  
 
 def nmo_RT (g, tt, win, fast):
     win_samp = int(win/g.dt/2)
 
     import model_FD
-    g_nmo = model_FD.gather(g.ntr, win_samp*2+1, g.dt, g.dh)
+    g_nmo = model_FD.gather(win_samp*2+1, g.dt, g.dh, g.sPos(), g.rPos())
 
-    fast = False
+#    fast = False
     if fast:
         for i in range (g.ntr):
             j = int (tt[i]/g.dt)
@@ -427,7 +427,7 @@ def calcTT_RT (m, geom_name, figure_name = None):
     
     return tt
     
-def calcTT_FMM_(vel, source_pos, image_path = None):
+def calcTT_FMM_(vel, source_pos):
     import numpy as np
     import pylab as plt
     import skfmm
@@ -445,12 +445,12 @@ def calcTT_FMM_(vel, source_pos, image_path = None):
  
     speed = vel.v
 
-    dist = skfmm.distance(phi, dx)
+#    dist = skfmm.distance(phi, dx)
 
     tt = skfmm.travel_time(phi, speed, dx)
 
-    if image_path != None:
-        vel.draw ('', image_path +'_model.png', min_ = 1500, max_=5000)
+#    if image_path != None:
+#        vel.draw ('', image_path +'_model.png', min_ = 1500, max_=5000)
 #        
 #        dist_t = np.transpose(dist)
 #        phi_t = np.transpose(phi)
@@ -499,15 +499,15 @@ def calcTT_FMM_(vel, source_pos, image_path = None):
     m_tt.v = tt
     return m_tt
     
-def calcTT_FMM (c, vel, fast, image_path = None):
+def calcTT_FMM (g, vel, fast):
     # take source position
-    [sx, sz] = c.getSourcePosition()
+    [sx, sz] = g.sPos()
     
     #calc fast marching travel times
-    m_tt = calcTT_FMM_(vel, [sx, sz], image_path)
+    m_tt = calcTT_FMM_(vel, [sx, sz])
     
     if fast:
-        rec_pos = c.getRecPosition()
+        rec_pos = g.rPos()
         tt = []
         for r in rec_pos:
             t = m_tt.getValue(r[0], r[1])
@@ -517,7 +517,7 @@ def calcTT_FMM (c, vel, fast, image_path = None):
     else:
         interpolator = m_tt.getInterp()
 	        
-        rec_pos = c.getRecPosition()
+        rec_pos = g.rPos()
         tt = []
         for r in rec_pos:
 	#        print(r)
@@ -569,20 +569,21 @@ def random_v(v1 = None):
     
 class GA_helper ():   
     
-    def init(self, c, g, m, win, fast):
+    def init(self, c, gathers, m, win, fast):
         self.c = c
-        self.g = g
+        self.gathers = gathers
         self.m = m
         self.win = win
         self.fast = fast
+        self.graw_gathers = True
                 
         source_x = m.lx()/2
         source_y = m.ly()/2
-
-        self.geom = generateGeom_RT(source_x, source_y, g.ntr, g.dh/1000., 0)
-        self.geom_name = 'geom.txt'
-        self.geom.writeToFile(self.geom_name) 
-        
+#
+#        self.geom = generateGeom_RT(source_x, source_y, g.ntr, g.dh/1000., 0)
+#        self.geom_name = 'geom.txt'
+#        self.geom.writeToFile(self.geom_name) 
+#        
         self.fd_rt = -1   # FD or RT 
         self.max_min = -1 # maximization or minimization
         
@@ -674,11 +675,8 @@ class GA_helper ():
         tt = calcTT_RT(dna_m, self.geom_name, figure_name)   
         return tt       
         
-    def getTT_FMM(self, dna, figure_name = None):
-        dna_m = self.getModel_FD(dna)
-        if dna_m == None:
-            return None
-        tt = calcTT_FMM(self.c, dna_m, self.fast, figure_name)   
+    def getTT_FMM(self, g, dna_m):
+        tt = calcTT_FMM(g, dna_m, self.fast)   
 #        print (tt)
         return tt        
 
@@ -703,44 +701,60 @@ class GA_helper ():
 #        print ('fitness_', info)'
         info = fd_info
 
-        wide_info = False
-        if wide_info:
-            tt = self.getTT_RT(dna);
-            rt_semb, rt_energy = calc_fit_RT (self.g, tt, self.win, self.fast, image_path)
-
-            tt = self.getTT_FMM(dna, image_path);
-            fmm_semb, fmm_energy = calc_fit_RT (self.g, tt,self.win, self.fast, image_path)
-            
-            dna_m = self.getModel_FD(dna)
-            fd_energy, fd_info = calcEnergy_FD (self.c, dna_m, image_path=image_path)
-    #        fwi_misfit_energy = calcMisfitEnergy_FD (self.c, dna_m, self.g, image_path=image_path)
-            
-            info = {'fitness': fitness, 
-                    'rt_energy': rt_energy,
-                    'rt_semb': rt_semb,
-                    'fmm_energy': fmm_energy,
-                    'fmm_semb': fmm_semb,
-    #                'fwi_misfit_energy': fwi_misfit_energy
-                    }
-            info = {info.items() +  fd_info.items()}
+#        wide_info = False
+#        if wide_info:
+#            tt = self.getTT_RT(dna);
+#            rt_semb, rt_energy = calc_fit_RT (self.g, tt, self.win, self.fast, image_path)
+#
+#            tt = self.getTT_FMM(dna, image_path);
+#            fmm_semb, fmm_energy = calc_fit_RT (self.g, tt,self.win, self.fast, image_path)
+#            
+#            dna_m = self.getModel_FD(dna)
+#            fd_energy, fd_info = calcEnergy_FD (self.c, dna_m, image_path=image_path)
+#    #        fwi_misfit_energy = calcMisfitEnergy_FD (self.c, dna_m, self.g, image_path=image_path)
+#            
+#            info = {'fitness': fitness, 
+#                    'rt_energy': rt_energy,
+#                    'rt_semb': rt_semb,
+#                    'fmm_energy': fmm_energy,
+#                    'fmm_semb': fmm_semb,
+#    #                'fwi_misfit_energy': fwi_misfit_energy
+#                    }
+#            info = {info.items() +  fd_info.items()}
     
         return fitness, info
                 
     def __fitness_RT(self, dna, image_path=None):
-        tt = self.getTT_RT(dna);
-        semb, energy = calc_fit_RT (self.g, tt,self.win, self.fast, image_path)            
-        if self.rt_energy_semb == 0:
-            return energy
-        if self.rt_energy_semb == 1:
-            return semb
+        fitness = 0
+        for shot in range(len(self.gathers)):
+            g = self.gathers[shot]
+            tt = self.getTT_RT(g, dna);
+            gather_image_path = None
+            if image_path != None and self.graw_gathers:
+                gather_image_path = image_path + '_' + str(shot)
+            semb, energy = calc_fit_RT (g, tt,self.win, self.fast, gather_image_path)            
+            if self.rt_energy_semb == 0:
+                fitness += energy
+            if self.rt_energy_semb == 1:
+                fitness += semb
+        return fitness
 
     def __fitness_FMM(self, dna, image_path=None):
-        tt = self.getTT_FMM(dna, image_path);
-        semb, energy = calc_fit_RT (self.g, tt,self.win, self.fast, image_path)            
-        if self.rt_energy_semb == 0:
-            return energy
-        if self.rt_energy_semb == 1:
-            return semb
+        fitness = 0
+        dna_m = self.getModel_FD(dna)            
+        for shot in range(len(self.gathers)):
+            g = self.gathers[shot]
+            gather_image_path = None
+            if image_path != None and self.graw_gathers:
+                gather_image_path = image_path + '_' + str(shot)
+            tt = self.getTT_FMM(g, dna_m);
+            semb, energy = calc_fit_RT (g, tt,self.win, self.fast, gather_image_path)            
+            if self.rt_energy_semb == 0:
+                fitness += energy
+            if self.rt_energy_semb == 1:
+                fitness += semb
+                
+        return fitness
  
     def __fitness_FD(self, dna, image_path=None):
         dna_m = self.getModel_FD(dna)
@@ -750,8 +764,8 @@ class GA_helper ():
                 return fitness, info
             if self.fd_energy_entropy == 1:
                 return entropy, info
-        if self.fd_energy_entropy == 2:
-            return calcMisfitEnergy_FD (self.c, dna_m, self.g, image_path=image_path)
+#        if self.fd_energy_entropy == 2:
+#            return calcMisfitEnergy_FD (self.c, dna_m, self.g, image_path=image_path)
             
     def getModel(self, dna):
         if self.fd_rt == 0:
@@ -822,26 +836,32 @@ class GA_helper ():
                 
         return (best_ind, maximum_weight, best_fitness)
         
-    def print_weight (self, weighted_population) :      
-        for i in range(len(weighted_population)):
-            print (weighted_population[i])
-            
-        (best_ind, maximum_weight, best_fitness) = self.getBest(weighted_population)
-        
-        weight_total = sum((item[1] for item in weighted_population))
-
-        print ("Best individual", best_ind, maximum_weight, best_fitness)
-        print ("Total fitness", weight_total)
+#    def print_weight (self, weighted_population) :      
+#        for i in range(len(weighted_population)):
+#            print (weighted_population[i])
+#            
+#        (best_ind, maximum_weight, best_fitness) = self.getBest(weighted_population)
+#        
+#        weight_total = sum((item[1] for item in weighted_population))
+#
+#        print ("Best individual", best_ind, maximum_weight, best_fitness)
+#        print ("Total fitness", weight_total)
 
     def draw (self, individual, images_path):
         #print ('individual',individual)
 #        dna_m = self.getModel_FD(individual)
         fitness, info = self.fitness (individual, image_path=images_path)
         
-        tt = self.getTT_FMM(individual)
-        if tt!= None:
-            self.g.draw (tt = tt, figure_name = images_path +'_gather.png')
-            
+        dna_m = self.getModel_FD(individual)
+        dna_m.draw ('', images_path +'_model.png', min_ = 1500, max_=5000)
+        
+        if self.graw_gathers:
+            for shot in range(len(self.gathers)):
+                g = self.gathers[shot]
+                tt = self.getTT_FMM(g, dna_m)
+                if tt!= None:
+                    g.draw (tt = tt, figure_name = images_path +'_gather' + str(shot) + '.png')
+                    
         return fitness, info 
   
 #     
@@ -889,8 +909,8 @@ class GA_helper ():
            
 class GA_helperI1 (GA_helper):   
 
-    def __init__(self, c, g, m, win, fast):
-        self.init(c,g,m, win,fast)
+    def __init__(self, c, gathers, m, win, fast):
+        self.init(c,gathers,m, win,fast)
         
         self.start_v1 = 1500
         self.end_v1 = 5000
@@ -1024,8 +1044,8 @@ class GA_helperI1 (GA_helper):
     
 class GA_helperI2 (GA_helper):   
     
-    def __init__(self, c, g, m, win, fast):
-        self.init(c,g,m, win, fast)
+    def __init__(self, c, gathers, m, win, fast):
+        self.init(c,gathers,m, win, fast)
 
     def empty_model (self):
         import model_FD
@@ -1087,8 +1107,8 @@ class GA_helperI2 (GA_helper):
 
 class GA_helperI3 (GA_helper):   
     
-    def __init__(self, c, g, m, win, fast):
-        self.init(c,g,m, win, fast)
+    def __init__(self, c, gathers, m, win, fast):
+        self.init(c,gathers,m, win, fast)
         self.layer_count = 3
         
     def random_z(self, z1 = None):
@@ -1271,8 +1291,8 @@ class model_FMM (GA_helper):
         
 class GA_helperI4 (GA_helper):   
     
-    def __init__(self, c, g, m, win, fast, nlayer, nx ):
-        self.init(c, g, m, win, fast) 
+    def __init__(self, c, gathers, m, win, fast, nlayer, nx ):
+        self.init(c, gathers, m, win, fast) 
         lx = self.c.nx*self.c.dh
         dx = lx/(nx-1)
         self.fmm_model = model_FMM(nlayer, nx, dx)
@@ -1282,7 +1302,7 @@ class GA_helperI4 (GA_helper):
         default_th = int(lz/self.fmm_model.nlayer)
         if th1 == None:
             th1 = default_th
-        return round_z(bound_random (th1, None, 0, default_th))    
+        return round_z(bound_random (th1, default_th, 0, default_th))    
         
     def random_dna(self):
         dna = []
@@ -1410,7 +1430,7 @@ def GA_run (helper, images_path, correct_dna,
     (global_best_ind, global_maximum_weight, global_best_fitness) = helper.getBest(weighted_population)
     
     print ('Init')
-    helper.print_weight (weighted_population)
+#    helper.print_weight (weighted_population)
     print ("global best individual", global_best_ind, global_maximum_weight, global_best_fitness)
     
     # print start point
