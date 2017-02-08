@@ -527,13 +527,41 @@ def calcTT_FMM (g, vel, fast):
         return tt
 
     
-def weighted_choice(items):
+def weighted_choice(items, power = 1, remove_average = 0):
   """
   Chooses a random element from items, where items is a list of tuples in
   the form (item, weight). weight determines the probability of choosing its
   respective item. Note: this function is borrowed from ActiveState Recipes.
   """
-  weight_total = sum((item[1] for item in items))
+  w = [item[1] for item in items]
+  
+  average = 0
+  min_val = w[0]
+  for i in range(len(w)):
+      w[i] = max(0, w[i])
+      min_val = min (min_val, w[i])
+      average += w[i]
+
+  average = average/len(w)
+
+#  print ('average', average)
+#  print ('min_val', min_val)
+  
+  if remove_average == 1:
+      for i in range(len(w)):
+          w[i] = w[i] - min_val
+
+  if remove_average == 2:
+      for i in range(len(w)):
+          w[i] = w[i] - average
+
+  for i in range(len(w)):
+      w[i] = max(0, w[i])
+
+
+  w = [v**power for v in w]
+      
+  weight_total = sum((v for v in w))
   
 #  l = []
 #  for item, weight in items:
@@ -541,9 +569,11 @@ def weighted_choice(items):
 #  print ('distrib', l)
   
   n = random.uniform(0, weight_total)
-  for item, weight, fitness in items:
+  
+  for i in range(len(items)):
+    weight = w[i]
     if n < weight:
-      return item
+      return items[i][0]
     n = n - weight
   return item
 
@@ -566,7 +596,12 @@ def round_z (v1, dv1 = 5):
         
 def random_v(v1 = None):
     return round_v(bound_random (v1, 1000, 1500, 5000))    
-    
+
+class GA_constraint ():
+    def applyConstraints (self, dna):
+        print ('apply_constraint not implemented')
+        
+       
 class GA_helper ():   
     
     def init(self, c, gathers, m, win, fast):
@@ -576,6 +611,7 @@ class GA_helper ():
         self.win = win
         self.fast = fast
         self.graw_gathers = True
+        self._constraints = []
                 
         source_x = m.lx()/2
         source_y = m.ly()/2
@@ -589,6 +625,14 @@ class GA_helper ():
         
 #        self.rt_energy_semb = 1 # semblance or energy
 #        self.fd_energy_entropy = 0 # entropy or energy or misfit_energy
+        
+    def addConstraint(self, constraint):
+        self._constraints.append(constraint)
+        
+    def applyConstraints(self, dna):
+        for constraint in self._constraints:
+            dna = constraint.applyConstraint(dna)
+        return dna
         
     def define_FD_energy(self):
         self.fd_rt = 0
@@ -653,10 +697,14 @@ class GA_helper ():
             print ('Maximization')
         if self.max_min == 1:
             print ('Minimization')
-            
+
+    def _random_dna(self):
+        print ('random_dna not implemented')            
 
     def random_dna(self):
-        print ('random_dna not implemented')
+        dna = self._random_dna()
+        dna = self.applyConstraints(dna)
+        return dna
         
     def random_population(self, pop_size):
         pop = []
@@ -778,8 +826,13 @@ class GA_helper ():
     def getModel_FD(self, dna):
         print ('getModel not implemented')
     
-    def mutate(self, dna, mutation_chance):        
+    def _mutate(self, dna, mutation_chance):        
         print ('mutate not implemented')
+        
+    def mutate(self, dna, mutation_chance):        
+        dna = self._mutate(dna, mutation_chance)
+        dna = self.applyConstraints(dna)
+        return dna
     
     def weight (self, population):
         if self.max_min == 0:
@@ -865,48 +918,15 @@ class GA_helper ():
                     
         return fitness, info 
   
-#     
-    def crossover(self, dna1, dna2):
-        return self.crossover2(dna1, dna2)
 
-#    def crossover1(self, dna1, dna2):
-#        child1 = []
-#        child2 = []
-#        for c in range(len(dna1)):
-#            w = random.random()
-#            v1 = None
-#            v2 = None
-#            if c == 0:
-#                v1 = round_z(w*dna1[c] + (1-w)*dna2[c])
-#                v2 = round_z((1-w)*dna1[c] + w*dna2[c])
-#            if c == 0:
-#                v1 = round_v(w*dna1[c] + (1-w)*dna2[c])
-#                v2 = round_v((1-w)*dna1[c] + w*dna2[c])         
-#            if c == 0:
-#                v1 = round_v(w*dna1[c] + (1-w)*dna2[c])
-#                v2 = round_v((1-w)*dna1[c] + w*dna2[c])
-#            child1.append(v1)
-#            child2.append(v2)
-#            
-##        print ('cross parents', dna1, dna2)
-##        print ('cross childs', child1, child2)
-#        return child1, child2
-#        
-    def crossover2(self, dna1, dna2):
-        child1 = []
-        child2 = []
-        for c in range(len(dna1)):
-            w = random.random()
-            if w < 0.5:
-                child1.append(dna1[c])
-                child2.append(dna2[c])
-            else:
-                child1.append(dna2[c])
-                child2.append(dna1[c])
-            
-#        print ('cross parents', dna1, dna2)
-#        print ('cross childs', child1, child2)
-        return child1, child2
+    def _crossover(self, dna1, dna2):
+        print ('_crossover not implemented')
+        
+    def crossover(self, dna1, dna2):     
+        dna1, dna2 = self._crossover(dna1, dna2)
+        dna1 = self.applyConstraints(dna1)
+        dna2 = self.applyConstraints(dna2)
+        return dna1, dna2
            
 class GA_helperI1 (GA_helper):   
 
@@ -945,7 +965,7 @@ class GA_helperI1 (GA_helper):
         return round_z(bound_random (z1, 50, self.start_z, self.end_z), self.dz)
                        # WARNINNG min depth 50m
 
-    def random_dna(self):
+    def _random_dna(self):
         z1 = self.random_z1(125)
         v1 = self.random_v1(2000)
         v2 = self.random_v2(3500)
@@ -1025,7 +1045,7 @@ class GA_helperI1 (GA_helper):
         dna_m = self.fillModel1(m, dna[0], dna[1], dna[2])
         return dna_m
             
-    def mutate(self, dna, mutation_chance):        
+    def _mutate(self, dna, mutation_chance):        
         for c in range(len(dna)):
             if random.random() <= mutation_chance:
                 if c == 0:
@@ -1058,7 +1078,7 @@ class GA_helperI2 (GA_helper):
         rand_m = model_FD.model(int(lx/new_dx)+1, int(lz/new_dz)+1, new_dx, new_dz)
         return rand_m
         
-    def random_dna(self):
+    def _random_dna(self):
         rand_m = self.empty_model()
         for i in range (rand_m.nx):
             for j in range (rand_m.nz):
@@ -1098,7 +1118,7 @@ class GA_helperI2 (GA_helper):
 #        print(m.z_nodes)
         return dna_m
             
-    def mutate(self, dna, mutation_chance):        
+    def _mutate(self, dna, mutation_chance):        
         for c in range(len(dna)):
             if random.random() <= mutation_chance:
                 dna[c] = random_v(dna[c])
@@ -1127,7 +1147,7 @@ class GA_helperI3 (GA_helper):
                     dna[j] = tmp
         return dna
             
-    def random_dna(self):
+    def _random_dna(self):
         dna = [[0, random_v()]]
     
         for l in range(self.layer_count-1):
@@ -1167,7 +1187,7 @@ class GA_helperI3 (GA_helper):
         dna_m = generate1DModel(self.c.nx, self.c.nz, self.c.dh, self.c.dh, dna)
         return dna_m
             
-    def mutate(self, dna, mutation_chance):        
+    def _mutate(self, dna, mutation_chance):        
         for c in range(len(dna)):   
              if random.random() <= mutation_chance:
                  if c != 0: # WARNING special case
@@ -1210,7 +1230,7 @@ class GA_helperI3 (GA_helper):
 #        print ('cross childs', child1, child2)
         return child1, child2
         
-    def crossover(self, dna1, dna2):
+    def _crossover(self, dna1, dna2):
         dna1, dna2 = self.crossover2(dna1, dna2)
         dna1 = self.sort_by_z(dna1)
         dna2 = self.sort_by_z(dna2)
@@ -1305,7 +1325,7 @@ class GA_helperI4 (GA_helper):
             th1 = default_th
         return round_z(bound_random (th1, default_th, 0, default_th))    
         
-    def random_dna(self):
+    def _random_dna(self):
         dna = []
         for i in range(self.fmm_model.nlayer):
             layer = []
@@ -1361,7 +1381,7 @@ class GA_helperI4 (GA_helper):
 #        print ('dna_m.v',dna_m.v)
         return dna_m
             
-    def mutate(self, dna, mutation_chance):        
+    def _mutate(self, dna, mutation_chance):        
         for i in range(self.fmm_model.nlayer):
             for j in range(self.fmm_model.nx):
                  if random.random() <= mutation_chance:
@@ -1402,9 +1422,48 @@ class GA_helperI4 (GA_helper):
 
         return child1, child2
         
-    def crossover(self, dna1, dna2):
+    def _crossover(self, dna1, dna2):
         return self.crossover2(dna1, dna2)
 
+def GA_test (helper, dna, pop_size, mutation = 0.1):
+    correct = helper.fitness(dna)[0]
+    correct = helper.applyConstraints(correct)
+    print ('Correct answer:', correct)
+    
+    for i in range(pop_size):
+        dna = helper.mutate(dna, mutation)
+        
+#        print(dna)
+        fit = helper.fitness(dna)[0]
+#        print (dna, fit)
+#        print(i)
+        if fit > correct:
+            print ('We have a problem:', i, dna, fit)
+            exit()
+        
+ 
+def MonteCarlo (helper, correct_dna, pop_size, mutation = 0.1):
+    correct = helper.fitness(correct_dna)[0]
+    print ('Correct answer:', correct)
+    
+    best_dna = helper.random_dna()
+    
+    best_fit = helper.fitness(best_dna)[0]
+    
+    for i in range(pop_size):
+        
+        if mutation > 0:
+            new_dna = helper.mutate(best_dna, mutation)
+        else:
+            new_dna = helper.random_dna()
+            
+        new_fit = helper.fitness(new_dna)[0]
+#        print (dna, fit)
+        if new_fit > best_fit:
+            best_dna = new_dna
+            best_fit = new_fit
+            print ('New best:', i, best_dna, best_fit)
+            
 #
 # Main driver
 # Generate a population and simulate GENERATIONS generations.
@@ -1454,8 +1513,12 @@ def GA_run (helper, images_path, correct_dna,
             ind1, ind2 = helper.crossover(ind1, ind2)
 
             # Mutate and add back into the population.
-            population.append(helper.mutate(ind1, mutation))
-            population.append(helper.mutate(ind2, mutation))
+            ind1 = helper.mutate(ind1, mutation)
+            ind2 = helper.mutate(ind2, mutation)
+
+            population.append(ind1)
+            population.append(ind2)
+            
             
         weighted_population = helper.weight (population)    
         (local_best_ind, local_maximum_weight, best_fitness) = helper.getBest(weighted_population)

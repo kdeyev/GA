@@ -354,6 +354,23 @@ def prepare_gather(c, images_path):
     return gathers    
 
     
+class GA_helperI4_Constraint (GA.GA_constraint):
+    def __init__(self, correct_dna):
+        self.correct_dna = correct_dna
+        self.nlayer = len(correct_dna)
+        self.nx = len(correct_dna[0])
+        
+    def applyConstraint (self, dna):
+        for i in range(self.nlayer):
+            for j in range(self.nx):
+                if i == 0: # first layer
+                    # use correct velocity
+                    dna[i][j][1] = correct_dna[i][j][1]
+        
+                
+        return dna
+        
+    
 if __name__ == "__main__":
     model_path = '//home/cloudera/TRM/acoustic_FD_TRM/tests/evgeny/'
     if not os.path.exists(model_path):
@@ -404,7 +421,10 @@ if __name__ == "__main__":
 #    modelingMultiGatherModel(model_path, helper.getModel_FD(correct_dna))
 #    exit ()
 
-    helper.define_FMM_energy()
+    helper.define_FMM_semb()
+    
+    constraint = GA_helperI4_Constraint (correct_dna)
+    helper.addConstraint(constraint)
 
 #    testEntropy (helper, images_path)
 #    exit ()
@@ -413,6 +433,12 @@ if __name__ == "__main__":
     
 #    testObjective (helper, correct_dna, figure_name = images_path)
 #    exit ()
+
+#    GA.MonteCarlo(helper,correct_dna, 100000, mutation = 0)
+#    exit()
+    
+#    GA.GA_test(helper,correct_dna, 1000000, mutation = 0.1)
+#    exit()
     
     GA.GA_run (helper, images_path, correct_dna,
-        pop_size = 300, generatoin_count = 100, mutation = 0.03)    
+        pop_size = 100, generatoin_count = 1000, mutation = 0.1)    
