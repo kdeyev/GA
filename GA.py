@@ -527,7 +527,7 @@ def calcTT_FMM (g, vel, fast):
         return tt
 
     
-def weighted_choice(items, power = 1, remove_average = 0):
+def weighted_choice(items, power = 1, remove_average = 2):
   """
   Chooses a random element from items, where items is a list of tuples in
   the form (item, weight). weight determines the probability of choosing its
@@ -610,7 +610,7 @@ class GA_helper ():
         self.m = m
         self.win = win
         self.fast = fast
-        self.graw_gathers = True
+        self.graw_gathers = False
         self._constraints = []
                 
         source_x = m.lx()/2

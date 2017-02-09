@@ -20,7 +20,7 @@ def modelingMultiGatherModel(model_path, vel):
     c.nu0 = 20 #Hz
 #    c.snap = 20
     c.snap = -1
-    c.g_ns = 3
+    c.g_ns = 11
     
         
     # enable PML
@@ -354,7 +354,7 @@ def prepare_gather(c, images_path):
     return gathers    
 
     
-class GA_helperI4_Constraint (GA.GA_constraint):
+class GA_helperI4_Constraint_V (GA.GA_constraint):
     def __init__(self, correct_dna):
         self.correct_dna = correct_dna
         self.nlayer = len(correct_dna)
@@ -370,7 +370,22 @@ class GA_helperI4_Constraint (GA.GA_constraint):
                 
         return dna
         
-    
+class GA_helperI4_Constraint_Well_Depth (GA.GA_constraint):
+    def __init__(self, correct_dna):
+        self.correct_dna = correct_dna
+        self.nlayer = len(correct_dna)
+        self.nx = len(correct_dna[0])
+        
+    def applyConstraint (self, dna):
+        for i in range(self.nlayer):
+            for j in range(self.nx):
+                if j == 0: 
+                    # use correct depth
+                    dna[i][j][0] = correct_dna[i][j][0]
+        
+                
+        return dna
+        
 if __name__ == "__main__":
     model_path = '//home/cloudera/TRM/acoustic_FD_TRM/tests/evgeny/'
     if not os.path.exists(model_path):
@@ -415,7 +430,7 @@ if __name__ == "__main__":
     correct_dna = [[[50., 2000.], [50., 2000.], [25., 2000.], [50., 2500.], [50., 2500.], [50., 2000.]],
                    [[50., 3500.], [50., 3500.], [75., 3500.], [50., 3500.], [50., 3500.], [50., 3500.]]
                    ]
-    helper = GA.GA_helperI4 (c, gathers, m, 0.01, True, len(correct_dna), len(correct_dna[0]))
+    helper = GA.GA_helperI4 (c, gathers, m, 0.00, True, len(correct_dna), len(correct_dna[0]))
 
                    
 #    modelingMultiGatherModel(model_path, helper.getModel_FD(correct_dna))
@@ -423,8 +438,8 @@ if __name__ == "__main__":
 
     helper.define_FMM_semb()
     
-    constraint = GA_helperI4_Constraint (correct_dna)
-    helper.addConstraint(constraint)
+    helper.addConstraint(GA_helperI4_Constraint_Well_Depth (correct_dna))
+    helper.addConstraint(GA_helperI4_Constraint_V (correct_dna))
 
 #    testEntropy (helper, images_path)
 #    exit ()
