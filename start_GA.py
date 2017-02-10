@@ -359,11 +359,12 @@ class GA_helperI4_Constraint_V (GA.GA_constraint):
         self.correct_dna = correct_dna
         self.nlayer = len(correct_dna)
         self.nx = len(correct_dna[0])
+        self.constr_layer = 0
         
     def applyConstraint (self, dna):
         for i in range(self.nlayer):
             for j in range(self.nx):
-                if i == 0: # first layer
+                if i == self.constr_layer: # first layer
                     # use correct velocity
                     dna[i][j][1] = correct_dna[i][j][1]
         
@@ -375,16 +376,38 @@ class GA_helperI4_Constraint_Well_Depth (GA.GA_constraint):
         self.correct_dna = correct_dna
         self.nlayer = len(correct_dna)
         self.nx = len(correct_dna[0])
+        self.well_pos = int (self.nx/2)
         
     def applyConstraint (self, dna):
         for i in range(self.nlayer):
             for j in range(self.nx):
-                if j == 0: 
+                if j == self.well_pos: 
                     # use correct depth
                     dna[i][j][0] = correct_dna[i][j][0]
         
                 
         return dna
+        
+class GA_helperI4_Constraint_Point (GA.GA_constraint):
+    def __init__(self, correct_dna):
+        self.correct_dna = correct_dna
+        self.nlayer = len(correct_dna)
+        self.nx = len(correct_dna[0])
+        self.well_pos = int (self.nx/2)
+        self.layer = 0
+        
+    def applyConstraint (self, dna):
+        for i in range(self.nlayer):
+            for j in range(self.nx):
+                if j == self.well_pos and i == self.layer:
+                    # use correct depth
+                    dna[i][j][0] = correct_dna[i][j][0]
+                    # use correct vel
+                    dna[i][j][1] = correct_dna[i][j][1]
+        
+                
+        return dna
+
         
 if __name__ == "__main__":
     model_path = '//home/cloudera/TRM/acoustic_FD_TRM/tests/evgeny/'
@@ -438,8 +461,9 @@ if __name__ == "__main__":
 
     helper.define_FMM_semb()
     
-    helper.addConstraint(GA_helperI4_Constraint_Well_Depth (correct_dna))
-    helper.addConstraint(GA_helperI4_Constraint_V (correct_dna))
+#    helper.addConstraint(GA_helperI4_Constraint_Well_Depth (correct_dna))
+#    helper.addConstraint(GA_helperI4_Constraint_V (correct_dna))
+    helper.addConstraint(GA_helperI4_Constraint_Point(correct_dna))
 
 #    testEntropy (helper, images_path)
 #    exit ()
