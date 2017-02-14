@@ -9,6 +9,7 @@ import numpy as np
 #import math
 import matplotlib.pyplot as plot
 import mpl_toolkits.mplot3d.axes3d as axes3d
+#import global_font
 
 def cube_marginals(cube, normalize=False):
     c_fcn = np.max
@@ -114,7 +115,6 @@ def calcEntropy_FD (final, sx, sz, area, image_path = None, norm = None):
 #    print ('total_power', total_power)
 #    print ('max_power', max_power)
     
-    
     entropy = 0
     for i in range (snap.nx):
         for j in range (snap.nz):
@@ -130,10 +130,27 @@ def calcEntropy_FD (final, sx, sz, area, image_path = None, norm = None):
         snap.draw ('zoom', figure_name = image_path + '_zoom' + str (area) + '.png', cmap = 'gray', norm = norm)
     
     return entropy
+
+def sourceWall_FD (source_pos, rho):    
+    [six, siz] = rho.getIndex(source_pos[0], source_pos[1])
+    six = int (six)
+    siz = int (siz)
+    wall_l = 125
+    wall_w = 200
+    wall_x = 750
+    wall_l = int(wall_l/rho.dz)
+    wall_w = int(wall_w/rho.dx)
+    wall_x = int(wall_x/rho.dx)
+    for j in range(wall_l):
+        for i in range(wall_w):
+            rho.v[six - wall_x - i][siz + j] = 1000
+            rho.v[six + wall_x + i][siz + j] = 1000
+    return rho
+
     
 def calcEnergy_FD (c, vel, image_path = None, area = 100, mask_pow=0):
     import model_FD
-    
+    c.snap = -1
     assert (c.back == 1)
     assert (c.snap == -1)
 
@@ -165,8 +182,7 @@ def calcEnergy_FD (c, vel, image_path = None, area = 100, mask_pow=0):
     # take last snap
     final = snaps.spans[0]
     
-    # take source position
-    [sx, sz] = g.sPos()
+
 #    print ('sx', sx, 'sz', sz)
     
     
@@ -610,7 +626,7 @@ class GA_helper ():
         self.m = m
         self.win = win
         self.fast = fast
-        self.graw_gathers = False
+        self.draw_gathers = False
         self._constraints = []
                 
         source_x = m.lx()/2
@@ -778,7 +794,7 @@ class GA_helper ():
             g = self.gathers[shot]
             tt = self.getTT_RT(g, dna);
             gather_image_path = None
-            if image_path != None and self.graw_gathers:
+            if image_path != None and self.draw_gathers:
                 gather_image_path = image_path + 'gather_' + str(shot)
             semb, energy = calc_fit_RT (g, tt,self.win, self.fast, gather_image_path)            
             if self.rt_energy_semb == 0:
@@ -793,7 +809,7 @@ class GA_helper ():
         for shot in range(len(self.gathers)):
             g = self.gathers[shot]
             gather_image_path = None
-            if image_path != None and self.graw_gathers:
+            if image_path != None and self.draw_gathers:
                 gather_image_path = image_path + 'gather_' + str(shot)
             tt = self.getTT_FMM(g, dna_m);
             semb, energy = calc_fit_RT (g, tt,self.win, self.fast, gather_image_path)            
@@ -908,7 +924,7 @@ class GA_helper ():
         dna_m = self.getModel_FD(individual)
         dna_m.draw ('', images_path +'_model.png', min_ = 1500, max_=5000)
         
-        if self.graw_gathers:
+        if self.draw_gathers:
             for shot in range(len(self.gathers)):
                 g = self.gathers[shot]
                 tt = self.getTT_FMM(g, dna_m)

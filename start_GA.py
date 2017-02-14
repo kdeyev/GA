@@ -91,8 +91,8 @@ def modelingOneModel(model_path, vel):
     
     c.nz = 50
     c.nu0 = 20 #Hz
-#    c.snap = 20
-    c.snap = -1
+    c.snap = 20
+    c.g_ns = 1
     
         
     # enable PML
@@ -103,16 +103,17 @@ def modelingOneModel(model_path, vel):
     
 #    vel = GA.generate1DModel (c.nx, c.nz, c.dh, c.dh, model)
     
-    vel.draw ('', model_path + 'vel_gen.png')    
+    vel.draw ('', model_path + 'vel_gen.png', min_=1500, max_=5000)    
 #    exit ()
     vel.writeToFile (c.vp_file)
 
+    
     rho = copy.deepcopy(vel)
     rho.resetValues (1)
-    # use vel as roh
+    g = c.readGather (0)
     rho.writeToFile (c.rho_file)
     
-    c.generateGeomFiles()
+    c.generateGeomFiles(0)
     
     c.wfl_file = param_name = c.path + 'snap_fw.bin'
     
@@ -137,15 +138,26 @@ def modelingOneModel(model_path, vel):
     c.wfl_file = param_name = c.path + 'snap_bw.bin'
 
 #    # MUTE    
-    g = c.readGather ()
+    g = c.readGather (0)
 #    g.muteDirect (-0.1, 2000)
 #    g.muteDirect (0.135, 3500, hyp = False)
 #    g.muteOffset (0, 1000)
 #    g.norm(1e+3)
     
-    new_nather_name = c.gather_file + '_mute'
+    
+    new_nather_name = c._gather_file + '_mute_0'
     g.writeToFile (new_nather_name)    
-    c.gather_file = new_nather_name
+    c._gather_file = new_nather_name  
+    c.g_gather_file = c.g_gather_file + '_0' + '_mute'
+#    print (new_nather_name)
+#    exit()
+
+#    rho = GA.sourceWall_FD(g.sPos(), rho)
+#    rho.writeToFile (c.rho_file)
+#    rho.draw ('', model_path + 'rho_gen_bw.png') 
+    
+    vel.draw ('', model_path + 'vel_gen_bw.png', min_=1500, max_=5000)    
+    vel.writeToFile (c.vp_file)
 
     
     param_name = c.path + 'param_bw.txt'
@@ -307,15 +319,15 @@ def prepare_gather_agc(c, images_path):
     gathers = []
     for shot in range(c.g_ns):
         g = c.readGather (shot)
-        g.norm_ampl = None # autonorm
-    #    g.draw ('', images_path + 'orig.png')
         
         # mute
         g.muteDirect (0.135, 3500, hyp = False)
         
         g.norm(1e+4)    
         g= run_SU(['/home/cloudera/cwp/bin/sugain', 'agc=1', 'wagc=0.05'], g)
-        
+
+        g.norm_ampl = 1 # autonorm    
+        g.draw ('', images_path + 'orig_' + str(shot) + '.png')
         gathers.append(g)
     
     return gathers   
@@ -413,13 +425,6 @@ if __name__ == "__main__":
     model_path = '//home/cloudera/TRM/acoustic_FD_TRM/tests/evgeny/'
     if not os.path.exists(model_path):
         os.makedirs(model_path)
-
-#    helper = GA.GA_helperI4 (c, g, m, 2, 3)
-#    correct_dna = [[[100., 2000.], [125., 2500.], [100., 2000.]],
-#                   [[50., 3500.], [25., 3000.], [50., 3500.]]
-#                   ]
-#    modelingOneModel(model_path, helper.getModel_FD(correct_dna))
-#    exit ()
     
     import model_FD    
     c = model_FD.config(model_path)    
@@ -453,7 +458,7 @@ if __name__ == "__main__":
     correct_dna = [[[50., 2000.], [50., 2000.], [25., 2000.], [50., 2500.], [50., 2500.], [50., 2000.]],
                    [[50., 3500.], [50., 3500.], [75., 3500.], [50., 3500.], [50., 3500.], [50., 3500.]]
                    ]
-    helper = GA.GA_helperI4 (c, gathers, m, 0.00, True, len(correct_dna), len(correct_dna[0]))
+    helper = GA.GA_helperI4 (c, gathers, m, 0.01, True, len(correct_dna), len(correct_dna[0]))
 
                    
 #    modelingMultiGatherModel(model_path, helper.getModel_FD(correct_dna))

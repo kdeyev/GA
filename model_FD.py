@@ -13,6 +13,8 @@ import os
 import subprocess
 import math
 
+font_size = 60
+global_font = {'fontname':'serif', 'size':str(font_size)}
 
 class model ():
     def __init__ (self, nx, nz, dx, dz, sx=0, sz=0):
@@ -102,9 +104,9 @@ class model ():
         fig = plt.figure()
 #        plt.rc('font', family='serif', size=60)
         ax = plt.subplot(111)
-        ax.set_title(label)
-        plt.ylabel('Depth (m)')
-        plt.xlabel('Location (m)')
+        ax.set_title(label, **global_font)
+        plt.ylabel('Depth (m)', **global_font)
+        plt.xlabel('Location (m)', **global_font)
              
         label_x = copy.deepcopy(self.x_nodes)
         label_z = copy.deepcopy(self.z_nodes)
@@ -120,8 +122,8 @@ class model ():
 #        print ('draw nx', self.nx)
 #        print ('draw nz', self.nz)
         
-        plt.xticks(range(len(label_x)), label_x)
-        plt.yticks(range(len(label_z)), label_z)
+        plt.xticks(range(len(label_x)), label_x, **global_font)
+        plt.yticks(range(len(label_z)), label_z, **global_font)
         
         v = numpy.transpose(self.v)
 #        a = self.dx/self.dz
@@ -136,7 +138,7 @@ class model ():
         cax = ax.imshow(v, aspect=a, vmin=vmin, vmax=vmax, cmap=cmap)
         
     #    fig.colorbar(cax, orientation='horizontal')
-        fig.colorbar(cax)
+        fig.colorbar(cax).ax.tick_params(labelsize=font_size)
         
     #    plt.grid(True)
         if figure_name != None:
@@ -349,9 +351,9 @@ class gather ():
         fig = plt.figure()
 #        plt.rc('font', family='serif', size=60)
         ax = plt.subplot(111)
-        ax.set_title(label)
-        plt.ylabel('Time (s)')
-        plt.xlabel('Trace')
+        ax.set_title(label, **global_font)
+        plt.ylabel('Time (s)', **global_font)
+        plt.xlabel('Trace', **global_font)
         
         if norm == None:
             norm = self.norm_ampl
@@ -363,7 +365,7 @@ class gather ():
             if i%50 != 0:
                 label_t[i] = ""
                 
-        plt.yticks(range(len(label_t)), label_t)
+        plt.yticks(range(len(label_t)), label_t, **global_font)
     
         a = 'auto'
         if norm != None:
@@ -374,10 +376,11 @@ class gather ():
         if tt != None:
             x = [v for v in range(len(tt))]
             y = [v/self.dt for v in tt]
-            ax.plot(x, y, '*', markersize=10)
+            ax.plot(x, y, 'r-', linewidth=10, markersize=10)
         
     #    fig.colorbar(cax, orientation='horizontal')
-        fig.colorbar(cax)
+        fig.colorbar(cax).ax.tick_params(labelsize=font_size)
+
         
     #    plt.grid(True)
         if figure_name != None:
@@ -848,7 +851,7 @@ class config ():
 #        plt.rc('font', family='serif', size=60)
         ax = plt.subplot(111)
 #        ax.set_title("Plan")
-        plt.xlabel('Time (s)')
+        plt.xlabel('Time (s)', **global_font)
         
         en_on_source = [abs(v) for v in en_on_source]
         x = [(self.nt-v)*self.dt for v in range(len(en_on_source))]
@@ -870,25 +873,28 @@ class config ():
         m  = model (self.nx, self.nz, self.dh, self.dh)
         m.readFromFile(self.vp_file)            
         if self.back == 0:
-            m.draw ('', images_dir + 'model.png', min_=1500, max_=5000)
-            
-        g = self.readGather ()
-        if self.back == 0:
-            g.draw ('', images_dir + 'forward_gather.png', norm = 1e-7)
+            m.draw ('', images_dir + 'forward_model.png', min_=1500, max_=5000)
         else:
-            g.draw ('', images_dir + 'backward_gather.png', norm = 1e-7)
+            m.draw ('', images_dir + 'backward_model.png', min_=1500, max_=5000)
+        
+        norm = 1e-8
+        g = self.readGather (0)
+        if self.back == 0:
+            g.draw ('', images_dir + 'forward_gather.png', norm = norm)
+        else:
+            g.draw ('', images_dir + 'backward_gather.png', norm = norm)
             
-        if self.back == 1:
-            self.drawEnargyAtSource(images_dir + 'energy_at_source.png')
-#            g.draw ('', images_dir + 'backward_gather_on_s.png',norm=None)
+#        if self.back == 1:
+#            self.drawEnargyAtSource(images_dir + 'energy_at_source.png')
+##            g.draw ('', images_dir + 'backward_gather_on_s.png',norm=None)
         
         snaps = snapShot(self.wfl_file, m)
         
         if self.back == 0:
-            snaps.draw (images_dir + 'forward_', norm = 1e-7)
+            snaps.draw (images_dir + 'forward_', norm = norm)
             
         if self.back == 1:
-            snaps.draw (images_dir + 'backward_', norm = 1e-7)
+            snaps.draw (images_dir + 'backward_', norm = norm)
             
         final = snaps.spans[len(snaps.spans)-1]
         
@@ -896,9 +902,9 @@ class config ():
 #        [sx, sz] = self._getSourcePosition()
         
         if self.back == 1:
-            final.draw ('test', figure_name = images_dir + 'final.png', cmap = 'gray', norm = 1e-7)               
-            zoom = final.zoom(g.sx, g.sz, 250, 250)
-            zoom.draw ('zoom', figure_name = images_dir + 'final_zoom.png', cmap = 'gray', norm = 1e-7)        
+            final.draw ('test', figure_name = images_dir + 'final.png', cmap = 'gray', norm = norm)               
+            zoom = final.zoom(g.s_pos[0], g.s_pos[1], 250, 250)
+            zoom.draw ('zoom', figure_name = images_dir + 'final_zoom.png', cmap = 'gray', norm = norm)        
         
             
     def _getSourcePosition (self):
