@@ -148,6 +148,7 @@ class model ():
         if show:
             plt.show ()
         plt.gcf().clear()
+        plt.close('all')
 
     def getIndex (self, x, z):
         i = (x - self.sx)/self.dx
@@ -390,6 +391,7 @@ class gather ():
         if show:
             plt.show ()
         plt.gcf().clear()
+        plt.close('all')
             
     def muteDirect (self, t0, v1, hyp = True, up=False) : 
         taper_samp = 20
@@ -863,6 +865,7 @@ class config ():
 #        if show:
 #            plt.show ()
         plt.gcf().clear()
+        plt.close('all')
             
     def createImages (self):
         

@@ -77,6 +77,7 @@ def plotcube(cube,xl=None,yl=None,zl=None,normalize=False,plot_front=False,show=
         
     if show:
         plot.show()
+    plot.close('all')
 #
 def generate1DModel (nx, nz, dx, dz, interfaces):
     import model_FD
@@ -148,7 +149,7 @@ def sourceWall_FD (source_pos, rho):
     return rho
 
     
-def calcEnergy_FD (c, vel, image_path = None, area = 100, mask_pow=0):
+def calcEnergy_FD (c, vel, image_path = None, area = 100, mask_pow=2):
     import model_FD
     c.snap = -1
     assert (c.back == 1)
@@ -599,6 +600,8 @@ def bound_random(v, dv, v1, v2):
         v = int((v1 + v2)/2)
     if dv == None:
         dv = int((v1 + v2)/2)
+        
+#    print ("bound_random", "v", v, "rv", rv, "v1", v1, "v2", v2, "dv", dv)
     while v + rv not in range(v1, v2) : 
         rv = random.randrange(-dv, dv, 1)
         
@@ -611,7 +614,7 @@ def round_z (v1, dv1 = 5):
     return round(v1/dv1)*dv1
         
 def random_v(v1 = None):
-    return round_v(bound_random (v1, 1000, 1500, 5000))    
+    return round_v(bound_random (v1, 1000, 1500, 6000))    
 
 class GA_constraint ():
     def applyConstraints (self, dna):
@@ -626,7 +629,7 @@ class GA_helper ():
         self.m = m
         self.win = win
         self.fast = fast
-        self.draw_gathers = False
+        self.draw_gathers = True
         self._constraints = []
                 
         source_x = m.lx()/2
@@ -1339,7 +1342,8 @@ class GA_helperI4 (GA_helper):
         default_th = int(lz/self.fmm_model.nlayer)
         if th1 == None:
             th1 = default_th
-        return round_z(bound_random (th1, default_th, 0, default_th))    
+#        print ("random th for", th1)
+        return round_z(bound_random (th1, default_th, 0, lz))    
         
     def _random_dna(self):
         dna = []
@@ -1397,11 +1401,26 @@ class GA_helperI4 (GA_helper):
 #        print ('dna_m.v',dna_m.v)
         return dna_m
             
-    def _mutate(self, dna, mutation_chance):        
+    def _mutate(self, dna, mutation_chance):      
+        lz = int(self.c.lz())
+        
         for i in range(self.fmm_model.nlayer):
             for j in range(self.fmm_model.nx):
                  if random.random() <= mutation_chance:
-                     dna[i][j][0] = self.random_th(dna[i][j][0])
+                    new_th = self.random_th(dna[i][j][0])
+                    delta_th = new_th - dna[i][j][0]
+
+#                    print ("_mutate", "th", dna[i][j][0], "new wth",new_th, "delta_th", delta_th )
+                    dna[i][j][0] = dna[i][j][0] + delta_th
+                    dna[i][j][0] = max (dna[i][j][0], 0)
+                    dna[i][j][0] = min (dna[i][j][0], lz)
+                    
+                    # update layer below
+                    if i < (self.fmm_model.nlayer -1):
+                        dna[i+1][j][0] = dna[i+1][j][0] - delta_th
+                        dna[i+1][j][0] = max (dna[i+1][j][0], 0)
+                        dna[i+1][j][0] = min (dna[i+1][j][0], lz)
+
                  if random.random() <= mutation_chance:
                      dna[i][j][1] = random_v(dna[i][j][1])                
                
@@ -1485,21 +1504,11 @@ def MonteCarlo (helper, correct_dna, pop_size, mutation = 0.1):
 # Generate a population and simulate GENERATIONS generations.
 #
 
-def GA_run (helper, images_path, correct_dna,
-        pop_size = 20, generatoin_count = 30, mutation = 0.1):  
-    helper.print_info()
 
-    if not os.path.exists(images_path):
-        os.makedirs(images_path)
-        
-    correct = helper.fitness(correct_dna)
-    print ('Correct answer:', correct)
+def GA_run_on_population (helper, images_path, population, 
+        generatoin_count = 30, mutation = 0.1):  
+    pop_size = len (population)
     
-    helper.draw (correct_dna, images_path + "correct")
-    
-    # Generate initial population. This will create a list of POP_SIZE strings,
-    # each initialized to a sequence of random characters.
-    population = helper.random_population(pop_size)
     weighted_population = helper.weight (population)
 
     best_generation = 0
@@ -1524,13 +1533,17 @@ def GA_run (helper, images_path, correct_dna,
             # Selection
             ind1 = weighted_choice(weighted_population)
             ind2 = weighted_choice(weighted_population)
+#            print ("after weighted_choice")
+
 
             # Crossover
             ind1, ind2 = helper.crossover(ind1, ind2)
+#            print ("after crosover")
 
             # Mutate and add back into the population.
             ind1 = helper.mutate(ind1, mutation)
             ind2 = helper.mutate(ind2, mutation)
+#            print ("after mutate")
 
             population.append(ind1)
             population.append(ind2)
@@ -1539,6 +1552,8 @@ def GA_run (helper, images_path, correct_dna,
         weighted_population = helper.weight (population)    
         (local_best_ind, local_maximum_weight, best_fitness) = helper.getBest(weighted_population)
         
+#        print ("after getBest")
+        
         if local_maximum_weight > global_maximum_weight:
             global_best_ind = local_best_ind
             global_maximum_weight = local_maximum_weight
@@ -1546,15 +1561,35 @@ def GA_run (helper, images_path, correct_dna,
             best_generation = generation
             print ("new global best!")
             helper.draw (local_best_ind, images_path + 'iter_' + str(generation))
+#            print ("after draw")
 
     
         print ('Generation', generation)
 #        helper.print_weight (weighted_population)
 
-        print ("global best individual", best_generation, global_best_ind, global_maximum_weight, global_best_fitness)
-        print ("local best individual", local_best_ind, local_maximum_weight, best_fitness)
+        print ("global best individual", best_generation, global_maximum_weight, global_best_fitness)
+        print ("local best individual", local_maximum_weight, best_fitness)
             
         weight_total = sum((item[1] for item in weighted_population))
         print ("Total weight", weight_total)
 
+    return population
 #        helper.fitness(local_best_ind,  image_path=images_path+'gen_'+str(generation))
+
+def GA_run (helper, images_path, correct_dna,
+        pop_size = 20, generatoin_count = 30, mutation = 0.1):  
+    helper.print_info()
+
+    if not os.path.exists(images_path):
+        os.makedirs(images_path)
+        
+    correct = helper.fitness(correct_dna)
+    print ('Correct answer:', correct)
+    
+    helper.draw (correct_dna, images_path + "correct")
+    
+    # Generate initial population. This will create a list of POP_SIZE strings,
+    # each initialized to a sequence of random characters.
+    population = helper.random_population(pop_size)
+    population = GA_run_on_population(helper, images_path, population, generatoin_count, mutation)
+    return population
