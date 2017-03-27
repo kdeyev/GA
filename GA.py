@@ -380,6 +380,25 @@ def calc_fit_RT (g, tt, win, fast, image_path=None):
     aver_semb = numpy.average(semb)
     return aver_semb, energy
 
+def put_spike_RT (g, tt):
+    
+    import model_FD
+    g_spike = model_FD.gather(g.nt, g.dt, g.dh, g.sPos(), g.rPos())
+
+    for i in range (g.ntr):
+        in_samp = int (tt[i]/g.dt)
+        if in_samp < 0 or in_samp >= (g.nt -1):
+            continue
+	           
+#        print (i, in_samp)
+        g_spike.v[in_samp][i] = 1
+        g_spike.v[in_samp+1][i] = 1
+
+    g_spike.norm_ampl = 1
+	
+    return g_spike
+
+
 def generateGeom_RT (xs, ys, nr, dx, dy):
     import geom_RT
     
@@ -544,7 +563,7 @@ def calcTT_FMM (g, vel, fast):
         return tt
 
     
-def weighted_choice(items, power = 1, remove_average = 2):
+def weighted_choice(items, power = 1, remove_average = 0):
   """
   Chooses a random element from items, where items is a list of tuples in
   the form (item, weight). weight determines the probability of choosing its
@@ -607,14 +626,14 @@ def bound_random(v, dv, v1, v2):
         
     return v+rv
   
-def round_v (v1, dv1 = 10):
+def round_v (v1, dv1 = 100):
     return round(v1/dv1)*dv1
 
 def round_z (v1, dv1 = 5):
     return round(v1/dv1)*dv1
         
 def random_v(v1 = None):
-    return round_v(bound_random (v1, 1000, 1500, 6000))    
+    return round_v(bound_random (v1, 3000, 1500, 6000))    
 
 class GA_constraint ():
     def applyConstraints (self, dna):
@@ -629,11 +648,14 @@ class GA_helper ():
         self.m = m
         self.win = win
         self.fast = fast
-        self.draw_gathers = True
+        self.draw_gathers = False
         self._constraints = []
-                
-        source_x = m.lx()/2
-        source_y = m.ly()/2
+        self._cache = {}
+        self._gatherCache = {}
+
+                         
+#        source_x = m.lx()/2
+#        source_y = m.ly()/2
 #
 #        self.geom = generateGeom_RT(source_x, source_y, g.ntr, g.dh/1000., 0)
 #        self.geom_name = 'geom.txt'
@@ -681,6 +703,10 @@ class GA_helper ():
         self.fd_rt = 2
         self.rt_energy_semb = 1 
         
+    def define_FMM_energy_semb(self):
+        self.fd_rt = 2
+        self.rt_energy_semb = 2 
+        
     def print_info (self):
         if self.fd_rt == 0:
             print ('Finite difference')
@@ -702,6 +728,9 @@ class GA_helper ():
             if self.rt_energy_semb == 1:
                 print ('Semblance')
                 self.max_min = 0
+            if self.rt_energy_semb == 2:
+                print ('Energy * Semblance')
+                self.max_min = 0
                 
         if self.fd_rt == 2:
             print ('Fast Marching Method')
@@ -710,6 +739,9 @@ class GA_helper ():
                 print ('Energy')
             if self.rt_energy_semb == 1:
                 print ('Semblance')
+                self.max_min = 0
+            if self.rt_energy_semb == 2:
+                print ('Energy * Semblance')
                 self.max_min = 0
                 
         if self.max_min == 0:
@@ -745,10 +777,28 @@ class GA_helper ():
     def getTT_FMM(self, g, dna_m):
         tt = calcTT_FMM(g, dna_m, self.fast)   
 #        print (tt)
-        return tt        
+        return tt   
+        
+    def putSpikeToGaters (self, dna):
+        dna_m = self.getModel_FD(dna)            
+        for shot in range(len(self.gathers)):
+            g = self.gathers[shot]
+            tt = self.getTT_FMM(g, dna_m);
+#            gather_image_path = None
+#            if image_path != None and self.draw_gathers:
+#                gather_image_path = image_path + 'gather_' + str(shot)
+            self.gathers[shot] = put_spike_RT (g, tt) 
+         
 
     def fitness(self, dna, image_path=None):
-        return self.fitness_(dna, image_path)
+        key = str(dna)
+        if self._cache.has_key (key):
+#            print ("bingo!")
+            return self._cache.get (key)
+        
+        fit = self.fitness_(dna, image_path)
+        self._cache [key] = fit
+        return fit
         
     def fitness_(self, dna, image_path=None):
         fd_info = None
@@ -759,37 +809,14 @@ class GA_helper ():
         if self.fd_rt == 2:
             fitness = self.__fitness_FMM(dna, image_path)
             
-#        print ('fitness_ fd_info', fd_info)
-#        print (type(fd_info))
-#        
-#        info = {'fitness', fitness}
-#        print (type(info))
-#        info = {info.items() +  fd_info.items()}
-#        print ('fitness_', info)'
-        info = fd_info
-
-#        wide_info = False
-#        if wide_info:
-#            tt = self.getTT_RT(dna);
-#            rt_semb, rt_energy = calc_fit_RT (self.g, tt, self.win, self.fast, image_path)
-#
-#            tt = self.getTT_FMM(dna, image_path);
-#            fmm_semb, fmm_energy = calc_fit_RT (self.g, tt,self.win, self.fast, image_path)
-#            
-#            dna_m = self.getModel_FD(dna)
-#            fd_energy, fd_info = calcEnergy_FD (self.c, dna_m, image_path=image_path)
-#    #        fwi_misfit_energy = calcMisfitEnergy_FD (self.c, dna_m, self.g, image_path=image_path)
-#            
-#            info = {'fitness': fitness, 
-#                    'rt_energy': rt_energy,
-#                    'rt_semb': rt_semb,
-#                    'fmm_energy': fmm_energy,
-#                    'fmm_semb': fmm_semb,
-#    #                'fwi_misfit_energy': fwi_misfit_energy
-#                    }
-#            info = {info.items() +  fd_info.items()}
-    
-        return fitness, info
+        return fitness, fd_info
+        
+    def fitnessGather(self, dna, dna_m, shot, image_path=None):
+        if self.fd_rt == 2:
+            return self.__fitness_FMM_gather(dna, dna_m, shot, image_path)
+        else:
+            throw (42)      
+        
                 
     def __fitness_RT(self, dna, image_path=None):
         fitness = 0
@@ -804,22 +831,40 @@ class GA_helper ():
                 fitness += energy
             if self.rt_energy_semb == 1:
                 fitness += semb
+            if self.rt_energy_semb == 2:
+                fitness += semb * energy
         return fitness
+        
+    def __fitness_FMM_gather(self, dna, dna_m, shot, image_path=None):
+        g = self.gathers[shot]
+
+        gather_key = self.getGatherCache (shot, dna)
+        if gather_key != None and self._gatherCache.has_key (gather_key):
+            return self._gatherCache.get(gather_key)
+            
+        gather_image_path = None
+        if image_path != None and self.draw_gathers:
+            gather_image_path = image_path + 'gather_' + str(shot)
+        tt = self.getTT_FMM(g, dna_m);
+        semb, energy = calc_fit_RT (g, tt,self.win, self.fast, gather_image_path) 
+        gather_fitness = None
+        if self.rt_energy_semb == 0:
+            gather_fitness = energy
+        if self.rt_energy_semb == 1:
+            gather_fitness = semb
+        if self.rt_energy_semb == 2:
+            gather_fitness = semb * energy
+
+        self._gatherCache[gather_key] = gather_fitness
+                
+        return gather_fitness
+ 
 
     def __fitness_FMM(self, dna, image_path=None):
         fitness = 0
         dna_m = self.getModel_FD(dna)            
         for shot in range(len(self.gathers)):
-            g = self.gathers[shot]
-            gather_image_path = None
-            if image_path != None and self.draw_gathers:
-                gather_image_path = image_path + 'gather_' + str(shot)
-            tt = self.getTT_FMM(g, dna_m);
-            semb, energy = calc_fit_RT (g, tt,self.win, self.fast, gather_image_path)            
-            if self.rt_energy_semb == 0:
-                fitness += energy
-            if self.rt_energy_semb == 1:
-                fitness += semb
+            fitness += self.__fitness_FMM_gather (dna, dna_m, shot, image_path)
                 
         return fitness
  
@@ -941,11 +986,11 @@ class GA_helper ():
     def _crossover(self, dna1, dna2):
         print ('_crossover not implemented')
         
-    def crossover(self, dna1, dna2):     
-        dna1, dna2 = self._crossover(dna1, dna2)
-        dna1 = self.applyConstraints(dna1)
-        dna2 = self.applyConstraints(dna2)
-        return dna1, dna2
+    def crossover(self, dna1, dna2):  
+        childs = self._crossover(dna1, dna2)
+        for i in range(len(childs)):
+            childs[i] = self.applyConstraints(childs[i])
+        return childs
            
 class GA_helperI1 (GA_helper):   
 
@@ -981,7 +1026,7 @@ class GA_helperI1 (GA_helper):
         return round_v(bound_random (v2, 1000, self.start_v2, self.end_v2), self.dv2)
         
     def random_z1(self,z1 = None):
-        return round_z(bound_random (z1, 50, self.start_z, self.end_z), self.dz)
+        return round_z(bound_random (z1, 100, self.start_z, self.end_z), self.dz)
                        # WARNINNG min depth 50m
 
     def _random_dna(self):
@@ -1155,7 +1200,7 @@ class GA_helperI3 (GA_helper):
         lz = int(self.c.lz())
         if z1 == None:
             z1 = int(lz/2)
-        return round_z(bound_random (z1, None, 0, lz))    
+        return round_z(bound_random (z1, lz, 0, lz))    
         
     def sort_by_z(self, dna):
         for i in range(len(dna)):
@@ -1256,9 +1301,9 @@ class GA_helperI3 (GA_helper):
 #        print ('crossover dna1', dna1)
 #        print ('crossover dna2', dna2)
         
-        return dna1, dna2
+        return [dna1, dna2]
         
-class model_FMM (GA_helper):   
+class model_FMM:   
     def __init__(self, nlayer, nx, dx, sx=0, sz=0):
         self.nx = nx
         self.nlayer = nlayer
@@ -1336,6 +1381,26 @@ class GA_helperI4 (GA_helper):
         lx = self.c.lx()
         dx = lx/(nx-1)
         self.fmm_model = model_FMM(nlayer, nx, dx)
+
+#        print (self.fmm_model.dx)
+        self._gatherModelIndex = []
+        for shot in range(len(self.gathers)):
+           g = self.gathers[shot]   
+           min_x = min ([r[0] for r in g.rPos ()])   
+           max_x = max ([r[0] for r in g.rPos ()])                 
+           min_ind = round((min_x - self.fmm_model.sx)/(self.fmm_model.dx))
+           max_ind = round((max_x - self.fmm_model.sx)/(self.fmm_model.dx))
+#           self._gatherModelIndex.append((min_ind, max_ind))
+           
+           gather_indices = []
+           for j in range(self.fmm_model.nx):
+               if j < min_ind or j > max_ind:
+                   continue
+               gather_indices.append (j)
+           self._gatherModelIndex.append (gather_indices)
+                   
+#           print ("shot", shot, "index", self._gatherModelIndex[shot] )
+        
         
     def random_th(self, th1 = None):
         lz = int(self.c.lz())
@@ -1343,7 +1408,7 @@ class GA_helperI4 (GA_helper):
         if th1 == None:
             th1 = default_th
 #        print ("random th for", th1)
-        return round_z(bound_random (th1, default_th, 0, lz))    
+        return round_z(bound_random (th1, lz, 0, lz))    
         
     def _random_dna(self):
         dna = []
@@ -1425,7 +1490,91 @@ class GA_helperI4 (GA_helper):
                      dna[i][j][1] = random_v(dna[i][j][1])                
                
         return dna
+        
+    def calcFitnessFunc (self, dna):
+        dna_m = self.getModel_FD(dna)  
+        
+        fitness_func = numpy.zeros(self.fmm_model.nx)     
+        fitness_gather = []
+        for shot in range(len(self.gathers)):
+            g = self.gathers[shot]   
 
+            fitness = self.fitnessGather (dna, dna_m, shot)
+            fitness_gather.append (fitness)
+            
+            gather_indices = self.getGatherIndices (shot)
+            for j in gather_indices:
+                fitness_func [j] += fitness
+            
+        return fitness_func, fitness_gather
+
+    def crossover3(self, dna1, dna2):
+        fitness_func1, fitness_gather1 = self.calcFitnessFunc (dna1)
+        fitness_func2, fitness_gather2 = self.calcFitnessFunc (dna2)
+#        print ("fitness_func1", fitness_func1)
+#        print ("fitness_func2", fitness_func2)
+        
+        child = copy.deepcopy(dna1)
+        mixed_index = []
+        for j in range(self.fmm_model.nx):
+            parent = None
+            if fitness_func1[j] >= fitness_func2[j]:
+                parent = 1
+            else:
+                parent = 2
+
+            mixed_index.append(parent)
+            
+            for i in range(self.fmm_model.nlayer):                        
+                for c in range(len(dna1[i][j])):
+                    if parent == 1:
+                        child[i][j][c] = dna1[i][j][c]
+                    else:
+                        child[i][j][c] = dna2[i][j][c]
+
+        fitness_func_child, fintess_gather_child = self.calcFitnessFunc (child)
+#        for j in range(self.fmm_model.nx):
+#            if fitness_func_child[j] < fitness_func1[j] or fitness_func_child[j] < fitness_func2[j]:
+#                print ("PROBLEM function")
+#                print ("fitness_func_child", fitness_func_child)
+#                print ("fitness_func1", fitness_func1)
+#                print ("fitness_func2", fitness_func2)
+#                print ("mixed_index", mixed_index)
+#                exit (1)
+        
+        fitness_child = self.fitness(child)[0]
+        fitness1 = self.fitness(dna1)[0]
+        fitness2 = self.fitness(dna2)[0]
+        if fitness_child < fitness1 or fitness_child < fitness2:
+            print ("PROBLEM", fitness_child)
+            
+#            print ("fitness_child", fitness_child)
+#            print ("fitness1", fitness1)
+#            print ("fitness2", fitness2)
+#            print ("")
+#            print ("fitness_func_child", fitness_func_child)
+#            print ("fitness_func1", fitness_func1)
+#            print ("fitness_func2", fitness_func2)
+#            print ("")
+#            print ("fitness_func_child", sum(fitness_func_child))
+#            print ("fitness_func1", sum(fitness_func1))
+#            print ("fitness_func2", sum(fitness_func2))
+#            print ("")
+#            print ("fintess_gather_child", fintess_gather_child)
+#            print ("fitness_gather1", fitness_gather1)
+#            print ("fitness_gather2", fitness_gather2)
+#            print ("")
+#            print ("mixed_index", mixed_index)
+#            exit (1)
+#            throw (42)
+            if fitness1 > fitness2:
+                return [dna1]
+            else:
+                return [dna2]
+        else:
+            print ("NORM", fitness_child)
+            return [child]
+        
     def crossover2(self, dna1, dna2):
         child1 = copy.deepcopy(dna1)
         child2 = copy.deepcopy(dna2)
@@ -1440,7 +1589,7 @@ class GA_helperI4 (GA_helper):
                         child1[i][j][c] = dna2[i][j][c]
                         child2[i][j][c] = dna1[i][j][c]
 
-        return child1, child2
+        return [child1, child2]
         
     def crossover1(self, dna1, dna2):
         child1 = copy.deepcopy(dna1)
@@ -1455,10 +1604,24 @@ class GA_helperI4 (GA_helper):
                     child1[i][j] = dna2[i][j]
                     child2[i][j] = dna1[i][j]
 
-        return child1, child2
+        return [child1, child2]
         
     def _crossover(self, dna1, dna2):
-        return self.crossover2(dna1, dna2)
+        return self.crossover3(dna1, dna2)
+                
+    def getGatherIndices (self, shot):
+        return self._gatherModelIndex [shot]
+
+    def getGatherCache (self, shot, dna):
+        gather_indices = self.getGatherIndices (shot)
+        submodel = []
+        for j in gather_indices:
+            a = []
+            for i in range(self.fmm_model.nlayer):
+                a.append(dna[i][j])
+            submodel.append(a)
+#        print ("shot", shot, "submodel", submodel )
+        return str(shot) + str(submodel)
 
 def GA_test (helper, dna, pop_size, mutation = 0.1):
     correct = helper.fitness(dna)[0]
@@ -1529,7 +1692,7 @@ def GA_run_on_population (helper, images_path, population,
         # Select two random individuals, based on their fitness probabilites, cross
         # their genes over at a random point, mutate them, and add them back to the
         # population for the next iteration.
-        for _ in range(pop_size/2):
+        while len (population) < pop_size:
             # Selection
             ind1 = weighted_choice(weighted_population)
             ind2 = weighted_choice(weighted_population)
@@ -1537,17 +1700,13 @@ def GA_run_on_population (helper, images_path, population,
 
 
             # Crossover
-            ind1, ind2 = helper.crossover(ind1, ind2)
+            childs = helper.crossover(ind1, ind2)
+#            print (childs)
+            for child in childs:
+                # Mutate and add back into the population.
+                child = helper.mutate(child, mutation)
+                population.append(child)
 #            print ("after crosover")
-
-            # Mutate and add back into the population.
-            ind1 = helper.mutate(ind1, mutation)
-            ind2 = helper.mutate(ind2, mutation)
-#            print ("after mutate")
-
-            population.append(ind1)
-            population.append(ind2)
-            
             
         weighted_population = helper.weight (population)    
         (local_best_ind, local_maximum_weight, best_fitness) = helper.getBest(weighted_population)

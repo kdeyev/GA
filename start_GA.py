@@ -479,7 +479,7 @@ class GA_helperI4_Constraint_Point (GA.GA_constraint):
 def prepare_helper (c, m, gathers, correct_dna, images_path):
     
     helper = GA.GA_helperI4 (c, gathers, m, 0.00, True, len(correct_dna), len(correct_dna[0]))
-    helper.define_FMM_semb()
+    helper.define_FMM_energy_semb()
       
     helper.addConstraint(GA_helperI4_Constraint_Well (correct_dna))
     helper.addConstraint(GA_helperI4_Constraint_V (correct_dna))
@@ -569,7 +569,8 @@ if __name__ == "__main__":
     
 
                
-    helper = prepare_helper (c, m, gathers, correct_dna, images_path)    
+    helper = prepare_helper (c, m, gathers, correct_dna, images_path)  
+    helper.putSpikeToGaters (correct_dna);
                    
 #    modelingMultiGatherModel(model_path, helper.getModel_FD(correct_dna))
 #    exit ()
