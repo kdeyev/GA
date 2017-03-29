@@ -200,14 +200,7 @@ def calcTT_FMM (g, vel, fast):
 	    
         return tt
 
-    
-def weighted_choice(items, power = 1, remove_average = 0):
-  """
-  Chooses a random element from items, where items is a list of tuples in
-  the form (item, weight). weight determines the probability of choosing its
-  respective item. Note: this function is borrowed from ActiveState Recipes.
-  """
-  w = [item[1] for item in items]
+def weighted_choice_(w, power = 1, remove_average = 0):
   
   average = 0
   min_val = w[0]
@@ -244,12 +237,26 @@ def weighted_choice(items, power = 1, remove_average = 0):
   
   n = random.uniform(0, weight_total)
   
-  for i in range(len(items)):
+  for i in range(len(w)):
     weight = w[i]
     if n < weight:
-      return items[i][0]
+      return i
     n = n - weight
-  return item
+    
+  print ("weighted_choice problem")
+  exit (0)
+  return -99
+  
+    
+def weighted_choice(items, power = 1, remove_average = 0):
+  """
+  Chooses a random element from items, where items is a list of tuples in
+  the form (item, weight). weight determines the probability of choosing its
+  respective item. Note: this function is borrowed from ActiveState Recipes.
+  """
+  w = [item[1] for item in items]
+  num = weighted_choice_(w, power, remove_average)
+  return items[num][0]
 
 def bound_random(v, dv, v1, v2):
     rv = 100000
@@ -982,34 +989,8 @@ class GA_helperI4 (GA_helper):
             
         return fitness_func, fitness_gather
 
-    def crossover3(self, dna1, dna2):
-        fitness_func1, fitness_gather1 = self.calcFitnessFunc (dna1)
-        fitness_func2, fitness_gather2 = self.calcFitnessFunc (dna2)
-#        print ("fitness_func1", fitness_func1)
-#        print ("fitness_func2", fitness_func2)
-        
-        child = copy.deepcopy(dna1)
-        mixed_index = []
-        for j in range(self.fmm_model.nx):
-            parent = None
-            if fitness_func1[j] >= fitness_func2[j]:
-                parent = 1
-            else:
-                parent = 2
-
-            mixed_index.append(parent)
-            
-            for i in range(self.fmm_model.nlayer):                        
-                for c in range(len(dna1[i][j])):
-                    if parent == 1:
-                        child[i][j][c] = dna1[i][j][c]
-                    else:
-                        child[i][j][c] = dna2[i][j][c]
-
-#        return [child]
-        
-
-        fitness_func_child, fintess_gather_child = self.calcFitnessFunc (child)
+    def checkChild (self, dna1, dna2, child):
+#        fitness_func_child, fintess_gather_child = self.calcFitnessFunc (child)
 #        for j in range(self.fmm_model.nx):
 #            if fitness_func_child[j] < fitness_func1[j] or fitness_func_child[j] < fitness_func2[j]:
 #                print ("PROBLEM function")
@@ -1050,7 +1031,73 @@ class GA_helperI4 (GA_helper):
                 return [dna2]
         else:
 #            print ("NORM", fitness_child)
-            return [child]
+            return [child]      
+        
+    def crossover3(self, dna1, dna2):
+        fitness_func1, fitness_gather1 = self.calcFitnessFunc (dna1)
+        fitness_func2, fitness_gather2 = self.calcFitnessFunc (dna2)
+#        print ("fitness_func1", fitness_func1)
+#        print ("fitness_func2", fitness_func2)
+        
+        child = copy.deepcopy(dna1)
+        mixed_index = []
+        for j in range(self.fmm_model.nx):
+            parent = None
+            if fitness_func1[j] >= fitness_func2[j]:
+                parent = 1
+            else:
+                parent = 2
+
+            mixed_index.append(parent)
+            
+            for i in range(self.fmm_model.nlayer):                        
+                for c in range(len(dna1[i][j])):
+                    if parent == 1:
+                        child[i][j][c] = dna1[i][j][c]
+                    else:
+                        child[i][j][c] = dna2[i][j][c]
+
+        return self.checkChild (dna1,dna2,child)
+
+    def crossover4(self, dna1, dna2):
+        fitness_func1, fitness_gather1 = self.calcFitnessFunc (dna1)
+        fitness_func2, fitness_gather2 = self.calcFitnessFunc (dna2)
+#        print ("fitness_func1", fitness_func1)
+#        print ("fitness_func2", fitness_func2)
+        
+        child = copy.deepcopy(dna1)
+#        mixed_index = []
+        for j in range(self.fmm_model.nx):
+            for i in range(self.fmm_model.nlayer):                        
+                for c in range(len(dna1[i][j])):            
+                    parent = weighted_choice_([fitness_func1[j], fitness_func2[j]])
+                    if parent == 0:
+                        child[i][j][c] = dna1[i][j][c]
+                    if parent == 1:
+                        child[i][j][c] = dna2[i][j][c]
+
+        return self.checkChild (dna1,dna2,child)
+        
+    
+    def crossoverPolygam(self, population):
+        
+        fitness_func = [ self.calcFitnessFunc (dna) for dna in population]
+        
+        new_population = []
+#        mixed_index = []
+        
+        while len (new_population) < pop_size:
+            child = copy.deepcopy(population[0])
+            for j in range(self.fmm_model.nx):
+                for i in range(self.fmm_model.nlayer):                        
+                    parent = weighted_choice_(fitness_func)
+                    for c in range(len(child[i][j])):            
+                        child[i][j][c] = population[parent][i][j][c]
+
+            new_population.append (child)
+
+        return new_population
+
 
     def crossover2(self, dna1, dna2):
         child1 = copy.deepcopy(dna1)
@@ -1144,10 +1191,43 @@ def MonteCarlo (helper, correct_dna, pop_size, mutation = 0.1):
 # Generate a population and simulate GENERATIONS generations.
 #
 
+def create_new_population (helper, mutation, weighted_population):
+               
+    pop_size = len (weighted_population)            
+    new_population = []
+    # Select two random individuals, based on their fitness probabilites, cross
+    # their genes over at a random point, mutate them, and add them back to the
+    # population for the next iteration.
+    while len (new_population) < pop_size:
+        # Selection
+        ind1 = weighted_choice(weighted_population)
+        ind2 = weighted_choice(weighted_population)
+#            print ("after weighted_choice")
+
+
+        # Crossover
+        childs = helper.crossover(ind1, ind2)
+#            print (childs)
+        for child in childs:
+            # Mutate and add back into the population.
+            child = helper.mutate(child, mutation)
+            new_population.append(child)
+#            print ("after crosover")
+    return new_population
+    
+
+def create_new_population_polygam (helper, mutation, weighted_population):
+    new_population = [v[0] for v in weighted_population]
+    new_population = helper.crossoverPolygam(new_population)
+    
+    for i in range(len(new_population)):
+        new_population[i] = helper.mutate(new_population[i], mutation)
+        
+    return new_population;
+
 
 def GA_run_on_population (helper, images_path, population, 
         generatoin_count = 30, mutation = 0.1):  
-    pop_size = len (population)
     
     weighted_population = helper.weight (population)
 
@@ -1164,26 +1244,7 @@ def GA_run_on_population (helper, images_path, population,
     # Simulate all of the generations.
     for generation in range(generatoin_count):
     
-        population = []
-
-        # Select two random individuals, based on their fitness probabilites, cross
-        # their genes over at a random point, mutate them, and add them back to the
-        # population for the next iteration.
-        while len (population) < pop_size:
-            # Selection
-            ind1 = weighted_choice(weighted_population)
-            ind2 = weighted_choice(weighted_population)
-#            print ("after weighted_choice")
-
-
-            # Crossover
-            childs = helper.crossover(ind1, ind2)
-#            print (childs)
-            for child in childs:
-                # Mutate and add back into the population.
-                child = helper.mutate(child, mutation)
-                population.append(child)
-#            print ("after crosover")
+        population = create_new_population (helper, mutation, weighted_population)
             
         weighted_population = helper.weight (population)    
         (local_best_ind, local_maximum_weight, best_fitness) = helper.getBest(weighted_population)
