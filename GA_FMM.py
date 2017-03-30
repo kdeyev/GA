@@ -1081,16 +1081,23 @@ class GA_helperI4 (GA_helper):
     
     def crossoverPolygam(self, population, power = 1, remove_average = 1):
         
-        fitness_func = [ self.calcFitnessFunc (dna) for dna in population]
+        fitness_func = [ self.calcFitnessFunc (dna)[0] for dna in population]
+#        print ("fitness_func", fitness_func[0])
+                
+        pop_size = len(population)
+        
+        fitness_func_transposed = []
+        for j in range(self.fmm_model.nx):
+            fitness_func_transposed.append([v[j] for v in fitness_func])
+            
+#        print ("fitness_func", fitness_func_transposed[0])
         
         new_population = []
-#        mixed_index = []
-        
         while len (new_population) < pop_size:
             child = copy.deepcopy(population[0])
             for j in range(self.fmm_model.nx):
-                for i in range(self.fmm_model.nlayer):                        
-                    parent = weighted_choice_(fitness_func, power, remove_average)
+                for i in range(self.fmm_model.nlayer):                      
+                    parent = weighted_choice_(fitness_func_transposed[j], power, remove_average)
                     for c in range(len(child[i][j])):            
                         child[i][j][c] = population[parent][i][j][c]
 
@@ -1244,7 +1251,7 @@ def GA_run_on_population (helper, images_path, population,
     # Simulate all of the generations.
     for generation in range(generatoin_count):
     
-        population = create_new_population (helper, mutation, weighted_population)
+        population = create_new_population_polygam (helper, mutation, weighted_population)
             
         weighted_population = helper.weight (population)    
         (local_best_ind, local_maximum_weight, best_fitness) = helper.getBest(weighted_population)
