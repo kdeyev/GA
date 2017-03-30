@@ -1079,7 +1079,7 @@ class GA_helperI4 (GA_helper):
         return self.checkChild (dna1,dna2,child)
         
     
-    def crossoverPolygam(self, population):
+    def crossoverPolygam(self, population, power = 1, remove_average = 1):
         
         fitness_func = [ self.calcFitnessFunc (dna) for dna in population]
         
@@ -1090,7 +1090,7 @@ class GA_helperI4 (GA_helper):
             child = copy.deepcopy(population[0])
             for j in range(self.fmm_model.nx):
                 for i in range(self.fmm_model.nlayer):                        
-                    parent = weighted_choice_(fitness_func)
+                    parent = weighted_choice_(fitness_func, power, remove_average)
                     for c in range(len(child[i][j])):            
                         child[i][j][c] = population[parent][i][j][c]
 
