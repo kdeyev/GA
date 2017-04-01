@@ -499,6 +499,9 @@ def prepare_helper (c, m, gathers, correct_dna, images_path):
                 
     helper = GA.GA_helperI4 (c, gathers, m, 0.00, True, len(correct_dna), len(correct_dna[0]), vel_constr, thick_constr)
     helper.define_FMM_energy_semb()
+    
+    
+    helper.putSpikeToGaters (correct_dna);
       
 #    helper.addConstraint(GA_helperI4_Constraint_Well (correct_dna))
     helper.addConstraint(GA_helperI4_Constraint_V (correct_dna))
@@ -589,7 +592,7 @@ if __name__ == "__main__":
 
                
     helper = prepare_helper (c, m, gathers, correct_dna, images_path)  
-    helper.putSpikeToGaters (correct_dna);
+
                    
 #    modelingMultiGatherModel(model_path, helper.getModel_FD(correct_dna))
 #    exit ()
@@ -607,4 +610,4 @@ if __name__ == "__main__":
 #    exit()
         
     GA.GA_run (helper, images_path, correct_dna,
-        pop_size = 1000, generatoin_count = 1000, mutation = 0.1)    
+        pop_size = 100, generatoin_count = 150, mutation = 0.1)    

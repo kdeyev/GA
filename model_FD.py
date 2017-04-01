@@ -930,6 +930,32 @@ class config ():
             y = float(k[1])
             rec.append([x,y])
         return rec
+        
+     
+def draw_convergence (func, figure_name = None, show=False):    
+    import matplotlib.pyplot as plt
+    
+    plt.rcParams['figure.figsize'] = 40, 30
+#        fig = plt.figure (figsize=(60, 15))
+#    fig = plt.figure()
+    plt.rc('font', family='serif', size=30)
+    ax = plt.subplot(111)
+#    ax.set_title(label, **global_font)
+    plt.ylabel('Generation')
+    plt.xlabel('Fitness')
+    
+    ax.plot(func, linewidth=5)
+    
+#    plt.grid(True)
+    if figure_name != None:
+        plt.savefig(figure_name,bbox_inches='tight', dpi=100)
+#            plt.savefig(figure_name,bbox_inches='tight')
+        
+    if show:
+        plt.show ()
+    plt.gcf().clear()
+    plt.close('all')
+   
             
 #def modelingOneModel(c, model_type):
 #        

@@ -248,7 +248,7 @@ def weighted_choice_(w, power = 1, remove_average = 0):
   return -99
   
     
-def weighted_choice(items, power = 1, remove_average = 0):
+def weighted_choice(items, power = 1, remove_average = 1):
   """
   Chooses a random element from items, where items is a list of tuples in
   the form (item, weight). weight determines the probability of choosing its
@@ -918,7 +918,7 @@ class GA_helperI4 (GA_helper):
         return round_z(bound_random_new (self._thickConstr[layer][0], self._thickConstr[layer][1]))    
         
     def random_v_constr(self, v, layer):
-        return round_z(bound_random_new (self._velConstr[layer][0], self._velConstr[layer][1]))  
+        return round_v(bound_random_new (self._velConstr[layer][0], self._velConstr[layer][1]))  
         
     def _random_dna(self):
         dna = []
@@ -1096,8 +1096,8 @@ class GA_helperI4 (GA_helper):
         while len (new_population) < pop_size:
             child = copy.deepcopy(population[0])
             for j in range(self.fmm_model.nx):
-                for i in range(self.fmm_model.nlayer):                      
-                    parent = weighted_choice_(fitness_func_transposed[j], power, remove_average)
+                parent = weighted_choice_(fitness_func_transposed[j], power, remove_average)                                            
+                for i in range(self.fmm_model.nlayer):  
                     for c in range(len(child[i][j])):            
                         child[i][j][c] = population[parent][i][j][c]
 
@@ -1138,7 +1138,7 @@ class GA_helperI4 (GA_helper):
         return [child1, child2]
         
     def _crossover(self, dna1, dna2):
-        return self.crossover3(dna1, dna2)
+        return self.crossover4(dna1, dna2)
                 
     def getGatherIndices (self, shot):
         return self._gatherModelIndex [shot]
@@ -1248,15 +1248,21 @@ def GA_run_on_population (helper, images_path, population,
     # print start point
     helper.draw (global_best_ind, images_path + "start")
 
+    convergence_best_func = []
+    convergence_best_func.append (0)
+#    convergence_best_func.append (global_maximum_weight)
+
+    convergence_aver_func = []
+    convergence_aver_func.append (0)
+    
+    
     # Simulate all of the generations.
     for generation in range(generatoin_count):
     
-        population = create_new_population_polygam (helper, mutation, weighted_population)
+        population = create_new_population (helper, mutation, weighted_population)
             
         weighted_population = helper.weight (population)    
         (local_best_ind, local_maximum_weight, best_fitness) = helper.getBest(weighted_population)
-        
-#        print ("after getBest")
         
         if local_maximum_weight > global_maximum_weight:
             global_best_ind = local_best_ind
@@ -1274,9 +1280,17 @@ def GA_run_on_population (helper, images_path, population,
         print ("global best individual", best_generation, global_maximum_weight, global_best_fitness)
         print ("local best individual", local_maximum_weight, best_fitness)
             
-        weight_total = sum((item[1] for item in weighted_population))
-        print ("Total weight", weight_total)
+        weight_aver = sum((item[1] for item in weighted_population))/len(weighted_population)
+        print ("Total weight", weight_aver)
 
+        convergence_best_func.append (local_maximum_weight)
+        convergence_aver_func.append (weight_aver)
+        if generation % 10 == 0:
+            import model_FD
+            model_FD.draw_convergence (convergence_best_func, images_path + 'convergence_best.png')
+            model_FD.draw_convergence (convergence_aver_func, images_path + 'convergence_aver.png')
+ 
+        
     return population
 #        helper.fitness(local_best_ind,  image_path=images_path+'gen_'+str(generation))
 
