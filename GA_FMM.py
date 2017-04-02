@@ -1068,9 +1068,9 @@ class GA_helperI4 (GA_helper):
         child = copy.deepcopy(dna1)
 #        mixed_index = []
         for j in range(self.fmm_model.nx):
+            parent = weighted_choice_([fitness_func1[j], fitness_func2[j]])
             for i in range(self.fmm_model.nlayer):                        
                 for c in range(len(dna1[i][j])):            
-                    parent = weighted_choice_([fitness_func1[j], fitness_func2[j]])
                     if parent == 0:
                         child[i][j][c] = dna1[i][j][c]
                     if parent == 1:
@@ -1138,7 +1138,7 @@ class GA_helperI4 (GA_helper):
         return [child1, child2]
         
     def _crossover(self, dna1, dna2):
-        return self.crossover4(dna1, dna2)
+        return self.crossover3(dna1, dna2)
                 
     def getGatherIndices (self, shot):
         return self._gatherModelIndex [shot]
@@ -1287,8 +1287,8 @@ def GA_run_on_population (helper, images_path, population,
         convergence_aver_func.append (weight_aver)
         if generation % 10 == 0:
             import model_FD
-            model_FD.draw_convergence (convergence_best_func, images_path + 'convergence_best.png')
-            model_FD.draw_convergence (convergence_aver_func, images_path + 'convergence_aver.png')
+            model_FD.draw_convergence (convergence_best_func, "Generation", "Fitness", "Best fitness", images_path + 'convergence_best.png')
+            model_FD.draw_convergence (convergence_aver_func, "Generation", "Fitness", "Aver fitness", images_path + 'convergence_aver.png')
  
         
     return population

@@ -932,7 +932,7 @@ class config ():
         return rec
         
      
-def draw_convergence (func, figure_name = None, show=False):    
+def draw_convergence (func, xlabel, ylabel, label=None, figure_name = None, show=False):    
     import matplotlib.pyplot as plt
     
     plt.rcParams['figure.figsize'] = 40, 30
@@ -940,9 +940,10 @@ def draw_convergence (func, figure_name = None, show=False):
 #    fig = plt.figure()
     plt.rc('font', family='serif', size=30)
     ax = plt.subplot(111)
-#    ax.set_title(label, **global_font)
-    plt.ylabel('Generation')
-    plt.xlabel('Fitness')
+    if label != None:
+        ax.set_title(label)
+    plt.ylabel(ylabel)
+    plt.xlabel(xlabel)
     
     ax.plot(func, linewidth=5)
     
