@@ -989,8 +989,29 @@ class GA_helperI4 (GA_helper):
             
         return fitness_func, fitness_gather
 
+        
+    def drawCurves (self, dna1, dna2, child):
+       
+        images_path = self.c.path + 'GA_images_evgeny_FMM/'
+       
+        fitness_func1, fitness_gather1 = self.calcFitnessFunc (dna1)
+        fitness_func2, fitness_gather2 = self.calcFitnessFunc (dna2)
+        fitness_func_child, fitness_gather_child = self.calcFitnessFunc (child)
+        
+        import model_FD
+        model_FD.draw_convergence (fitness_gather1, "Gather", "Fitness", "Fitness of gathers parent 1", images_path + 'gather1_fit.png')
+        model_FD.draw_convergence (fitness_gather2, "Gather", "Fitness", "Fitness of gathers parent 2", images_path + 'gather2_fit.png')
+        model_FD.draw_convergence (fitness_gather_child, "Gather", "Fitness", "Fitness of gathers child", images_path + 'gather_child_fit.png')
+ 
+        model_FD.draw_convergence (fitness_func1, "Position", "Fitness", "Fitness function of parent 1", images_path + 'func1_fit.png')
+        model_FD.draw_convergence (fitness_func2, "Position", "Fitness", "Fitness function of parent 2", images_path + 'func2_fit.png')
+        model_FD.draw_convergence (fitness_func_child, "Position", "Fitness", "Fitness function of child", images_path + 'func_child_fit.png')
+        
+        exit (0)
+ 
+        
     def checkChild (self, dna1, dna2, child):
-#        fitness_func_child, fintess_gather_child = self.calcFitnessFunc (child)
+#         fitness_func_child, fintess_gather_child = self.calcFitnessFunc (child)
 #        for j in range(self.fmm_model.nx):
 #            if fitness_func_child[j] < fitness_func1[j] or fitness_func_child[j] < fitness_func2[j]:
 #                print ("PROBLEM function")
@@ -1057,6 +1078,8 @@ class GA_helperI4 (GA_helper):
                     else:
                         child[i][j][c] = dna2[i][j][c]
 
+
+        #self.drawCurves (dna1,dna2,child)
         return self.checkChild (dna1,dna2,child)
 
     def crossover4(self, dna1, dna2):
