@@ -11,6 +11,25 @@ import os
 #import mpl_toolkits.mplot3d.axes3d as axes3d
 #import global_font
 
+
+def getSparkContext ():
+    #######
+    # Spark
+    #######
+    from pyspark import SparkContext, SparkConf
+    
+    conf = SparkConf()
+    conf.setAppName("GA spark")
+#        if seisspark_config.local_spark:
+#    conf.setMaster("local")
+    sc = SparkContext(conf=conf)
+#        s_sc.addPyFile("seisspark_config.py")
+#        s_sc.addPyFile("seisspark.py")
+#        s_sc.addPyFile("segypy.py")
+    return sc
+
+g_sc = getSparkContext ()
+
 def nmo_FMM (g, tt, win, fast):
     win_samp = int(win/g.dt/2)
 
@@ -438,47 +457,43 @@ class GA_helper ():
     def weight (self, population):
         if self.max_min == 0:
             return self.__weight_max (population)
-        if self.max_min == 1:
-            return self.__weight_min (population)
+        else:
+            throw (42)
         
     def __weight_max (self, population):
-        weighted_population = []
-
-        # Add individuals and their respective fitness levels to the weighted
-        # population list. This will be used to pull out individuals via certain
-        # probabilities during the selection phase. Then, reset the population list
-        # so we can repopulate it after selection.
-        for individual in population:
-            fitness_val, info = self.fitness(individual)
-
-            # Generate the (individual,fitness) pair, taking in account whether or
-            # not we will accidently divide by zero.
-            pair = (individual, fitness_val, info)
-
-            weighted_population.append(pair)
+        if g_sc != None:
+            par_pop = g_sc.parallelize (population)
+            weighted_population = par_pop.map(lambda dna: [dna, self.fitness(dna)[0], None]).collect()
+        else:   
+            # Add individuals and their respective fitness levels to the weighted
+            # population list. This will be used to pull out individuals via certain
+            # probabilities during the selection phase. Then, reset the population list
+            # so we can repopulate it after selection.
+            weighted_population = [[dna, self.fitness(dna)[0], None] for dna in population]
+                                    
         return weighted_population
         
-    def __weight_min (self, population):
-        weighted_population = []
-
-        # Add individuals and their respective fitness levels to the weighted
-        # population list. This will be used to pull out individuals via certain
-        # probabilities during the selection phase. Then, reset the population list
-        # so we can repopulate it after selection.
-        for individual in population:
-            max_weight = 100000000000000000
-            fitness_val, info = self.fitness(individual)
-            
-            
-            # not we will accidently divide by zero.
-            if fitness_val == 0:
-                pair = (individual, max_weight, info)
-            else:
-                assert (1.0/fitness_val<max_weight)
-                pair = (individual, 1.0/fitness_val, info)
- 
-            weighted_population.append(pair)
-        return weighted_population
+#    def __weight_min (self, population):
+#        weighted_population = []
+#
+#        # Add individuals and their respective fitness levels to the weighted
+#        # population list. This will be used to pull out individuals via certain
+#        # probabilities during the selection phase. Then, reset the population list
+#        # so we can repopulate it after selection.
+#        for individual in population:
+#            max_weight = 100000000000000000
+#            fitness_val, info = self.fitness(individual)
+#            
+#            
+#            # not we will accidently divide by zero.
+#            if fitness_val == 0:
+#                pair = (individual, max_weight, info)
+#            else:
+#                assert (1.0/fitness_val<max_weight)
+#                pair = (individual, 1.0/fitness_val, info)
+# 
+#            weighted_population.append(pair)
+#        return weighted_population
     
         
     def getBest(self, weighted_population):
@@ -576,36 +591,7 @@ class GA_helperI1 (GA_helper):
 
     ## PROXY
     def fitness(self, dna, image_path=None):            
-        z = dna[0]
-        v1 = dna[1]
-        v2 = dna[2]
-        z = int((z-self.start_z)/self.dz)
-        v1 = int((v1-self.start_v1)/self.dv1)
-        v2 = int((v2-self.start_v2)/self.dv2)
-
-        # TODO: need  to uncomment     fitness_val for optimization
-#        fitness_val = self.cube[z][v2][v1]
-        fitness_val = 0
-        
-        info = []
-        if fitness_val == 0:
-            fitness_val, info = self.fitness_(dna, image_path)
-            self.cube[z][v2][v1] = fitness_val
-
-
-#        if image_path != None:
-#            figure_name__ = image_path+'cube.png'
-#            
-#            plotcube(self.cube, 
-#                     self.v1,
-#                     self.v2,
-#                     self.z,
-#                      x_label = 'V1',
-#                      y_label = 'V2',
-#                      z_label = 'Z',
-#                      figure_name = figure_name__
-#                      )
-#            
+        fitness_val, info = self.fitness_(dna, image_path)
         return fitness_val, info
         
     @staticmethod
@@ -990,22 +976,17 @@ class GA_helperI4 (GA_helper):
         return fitness_func, fitness_gather
 
         
-    def drawCurves (self, dna1, dna2, child):
+    def drawCurves (self, population, last):
        
         images_path = self.c.path + 'GA_images_evgeny_FMM/'
        
-        fitness_func1, fitness_gather1 = self.calcFitnessFunc (dna1)
-        fitness_func2, fitness_gather2 = self.calcFitnessFunc (dna2)
-        fitness_func_child, fitness_gather_child = self.calcFitnessFunc (child)
+        fff = [self.calcFitnessFunc (dna) for dna in population]
+        fitness_func = [v[0] for v in fff]
+        fitness_gather = [v[1] for v in fff]
         
         import model_FD
-        model_FD.draw_convergence (fitness_gather1, "Gather", "Fitness", "Fitness of gathers parent 1", images_path + 'gather1_fit.png')
-        model_FD.draw_convergence (fitness_gather2, "Gather", "Fitness", "Fitness of gathers parent 2", images_path + 'gather2_fit.png')
-        model_FD.draw_convergence (fitness_gather_child, "Gather", "Fitness", "Fitness of gathers child", images_path + 'gather_child_fit.png')
- 
-        model_FD.draw_convergence (fitness_func1, "Position", "Fitness", "Fitness function of parent 1", images_path + 'func1_fit.png')
-        model_FD.draw_convergence (fitness_func2, "Position", "Fitness", "Fitness function of parent 2", images_path + 'func2_fit.png')
-        model_FD.draw_convergence (fitness_func_child, "Position", "Fitness", "Fitness function of child", images_path + 'func_child_fit.png')
+        model_FD.draw_convergence (fitness_gather, "Gather", "Fitness", "Fitness of gathers", images_path + 'gather_fit.png', last = last) 
+        model_FD.draw_convergence (fitness_func, "Position", "Fitness", "Fitness function of parent", images_path + 'func_fit.png')
         
         exit (0)
  
@@ -1078,8 +1059,6 @@ class GA_helperI4 (GA_helper):
                     else:
                         child[i][j][c] = dna2[i][j][c]
 
-
-        #self.drawCurves (dna1,dna2,child)
         return self.checkChild (dna1,dna2,child)
 
     def crossover4(self, dna1, dna2):
@@ -1194,56 +1173,74 @@ def GA_test (helper, dna, pop_size, mutation = 0.1):
             exit()
         
  
-def MonteCarlo (helper, correct_dna, pop_size, mutation = 0.1):
-    correct = helper.fitness(correct_dna)[0]
-    print ('Correct answer:', correct)
-    
-    best_dna = helper.random_dna()
-    
-    best_fit = helper.fitness(best_dna)[0]
-    
-    for i in range(pop_size):
-        
-        if mutation > 0:
-            new_dna = helper.mutate(best_dna, mutation)
-        else:
-            new_dna = helper.random_dna()
-            
-        new_fit = helper.fitness(new_dna)[0]
-#        print (dna, fit)
-        if new_fit > best_fit:
-            best_dna = new_dna
-            best_fit = new_fit
-            print ('New best:', i, best_dna, best_fit)
-            
+#def MonteCarlo (helper, correct_dna, pop_size, mutation = 0.1):
+#    correct = helper.fitness(correct_dna)[0]
+#    print ('Correct answer:', correct)
+#    
+#    best_dna = helper.random_dna()
+#    
+#    best_fit = helper.fitness(best_dna)[0]
+#    
+#    for i in range(pop_size):
+#        
+#        if mutation > 0:
+#            new_dna = helper.mutate(best_dna, mutation)
+#        else:
+#            new_dna = helper.random_dna()
+#            
+#        new_fit = helper.fitness(new_dna)[0]
+##        print (dna, fit)
+#        if new_fit > best_fit:
+#            best_dna = new_dna
+#            best_fit = new_fit
+#            print ('New best:', i, best_dna, best_fit)
+#            
 #
 # Main driver
 # Generate a population and simulate GENERATIONS generations.
 #
+def create_childs (helper, mutation, weighted_population):
+    # Selection
+    ind1 = weighted_choice(weighted_population)
+    ind2 = weighted_choice(weighted_population)
+
+    # Crossover
+    childs = helper.crossover(ind1, ind2)
+    
+    for i in range(len(childs)):
+        # Mutate and add back into the population.
+        childs[i] = helper.mutate(childs[i], mutation)
+    return childs
 
 def create_new_population (helper, mutation, weighted_population):
                
     pop_size = len (weighted_population)            
     new_population = []
-    # Select two random individuals, based on their fitness probabilites, cross
-    # their genes over at a random point, mutate them, and add them back to the
-    # population for the next iteration.
-    while len (new_population) < pop_size:
-        # Selection
-        ind1 = weighted_choice(weighted_population)
-        ind2 = weighted_choice(weighted_population)
-#            print ("after weighted_choice")
 
-
-        # Crossover
-        childs = helper.crossover(ind1, ind2)
-#            print (childs)
-        for child in childs:
-            # Mutate and add back into the population.
-            child = helper.mutate(child, mutation)
-            new_population.append(child)
-#            print ("after crosover")
-    return new_population
+    # TEST child count
+    ind1 = weighted_choice(weighted_population)
+    ind2 = weighted_choice(weighted_population)
+    childs = helper.crossover(ind1, ind2)
+    childs_count = len (childs)
+    
+    if g_sc != None:
+        par_pop = g_sc.parallelize (range(pop_size/childs_count))
+        new_population_ = par_pop.map(lambda i: create_childs (helper, mutation, weighted_population)).collect()
+        new_population = []
+        for childs in new_population_:
+            for child in childs:
+                new_population.append(child)
+        return new_population
+    else:
+        # Select two random individuals, based on their fitness probabilites, cross
+        # their genes over at a random point, mutate them, and add them back to the
+        # population for the next iteration.
+        while len (new_population) < pop_size:
+            childs = create_childs (helper, mutation, weighted_population)
+            for child in childs:
+                new_population.append(child)
+    #            print ("after crosover")
+        return new_population
     
 
 def create_new_population_polygam (helper, mutation, weighted_population):
@@ -1310,8 +1307,8 @@ def GA_run_on_population (helper, images_path, population,
         convergence_aver_func.append (weight_aver)
         if generation % 10 == 0:
             import model_FD
-            model_FD.draw_convergence (convergence_best_func, "Generation", "Fitness", "Best fitness", images_path + 'convergence_best.png')
-            model_FD.draw_convergence (convergence_aver_func, "Generation", "Fitness", "Aver fitness", images_path + 'convergence_aver.png')
+            model_FD.draw_convergence ([convergence_best_func], "Generation", "Fitness", "Best fitness", images_path + 'convergence_best.png')
+            model_FD.draw_convergence ([convergence_aver_func], "Generation", "Fitness", "Aver fitness", images_path + 'convergence_aver.png')
  
         
     return population
