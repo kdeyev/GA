@@ -27,7 +27,9 @@ def getSparkContext ():
 #        s_sc.addPyFile("seisspark.py")
 #        s_sc.addPyFile("segypy.py")
     return sc
+#    return None
 
+    
 g_sc = getSparkContext ()
 
 def nmo_FMM (g, tt, win, fast):
@@ -309,10 +311,9 @@ class GA_constraint ():
        
 class GA_helper ():   
     
-    def init(self, c, gathers, m, win, fast):
-        self.c = c
+    def init(self, modelGeom, gathers, win, fast):
+        self.modelGeom = modelGeom
         self.gathers = gathers
-        self.m = m
         self.win = win
         self.fast = fast
         self.draw_gathers = False
@@ -463,7 +464,7 @@ class GA_helper ():
     def __weight_max (self, population):
         if g_sc != None:
             par_pop = g_sc.parallelize (population)
-            weighted_population = par_pop.map(lambda dna: [dna, self.fitness(dna)[0], None]).collect()
+            weighted_population = par_pop.map(lambda dna: [dna, self.g_broadcastHelper.value.fitness(dna)[0], None]).collect()
         else:   
             # Add individuals and their respective fitness levels to the weighted
             # population list. This will be used to pull out individuals via certain
@@ -546,8 +547,8 @@ class GA_helper ():
            
 class GA_helperI1 (GA_helper):   
 
-    def __init__(self, c, gathers, m, win, fast):
-        self.init(c,gathers,m, win,fast)
+    def __init__(self, modelGeom, gathers, win, fast):
+        self.init(modelGeom, gathers, win,fast)
         
         self.start_v1 = 1500
         self.end_v1 = 5000
@@ -564,7 +565,7 @@ class GA_helperI1 (GA_helper):
         self.nv2 = int((self.end_v2 - self.start_v2)/self.dv2 + 1)
         self.nz = int((self.end_z - self.start_z)/self.dz + 1)
         
-        self.cube = numpy.zeros((self.nz, self.nv2, self.nv1))
+#        self.cube = numpy.zeros((self.nz, self.nv2, self.nv1))
         
         self.z = numpy.arange(self.start_z, self.end_z + self.dz, self.dz)
         self.v1 = numpy.arange(self.start_v1, self.end_v1 + self.dv1, self.dv1)
@@ -610,7 +611,7 @@ class GA_helperI1 (GA_helper):
     def getModel_FD(self, dna):
         import model_FD
         
-        m = model_FD.model(self.c.nx, self.c.nz, self.c.dh, self.c.dh)
+        m = model_FD.model(self.modelGeom.nx, self.modelGeom.nz, self.modelGeom.dx, self.modelGeom.dz)
         dna_m = self.fillModel1(m, dna[0], dna[1], dna[2])
         return dna_m
             
@@ -634,13 +635,13 @@ class GA_helperI1 (GA_helper):
     
 class GA_helperI2 (GA_helper):   
     
-    def __init__(self, c, gathers, m, win, fast):
-        self.init(c,gathers,m, win, fast)
+    def __init__(self, modelGeom, gathers, win, fast):
+        self.init(modelGeom,gathers, win, fast)
 
     def empty_model (self):
         import model_FD
-        lx = self.c.lx()
-        lz = self.c.lz()
+        lx = self.modelGeom.lx()
+        lz = self.modelGeom.lz()
         new_dx = 10001
         new_dz = 25
         
@@ -697,12 +698,12 @@ class GA_helperI2 (GA_helper):
 
 class GA_helperI3 (GA_helper):   
     
-    def __init__(self, c, gathers, m, win, fast):
-        self.init(c,gathers,m, win, fast)
+    def __init__(self, modelGeom, gathers, win, fast):
+        self.init(modelGeom, gathers, win, fast)
         self.layer_count = 3
         
     def random_z(self, z1 = None):
-        lz = int(self.c.lz())
+        lz = int(self.modelGeom.lz())
         if z1 == None:
             z1 = int(lz/2)
         return round_z(bound_random (z1, lz, 0, lz))    
@@ -726,7 +727,7 @@ class GA_helperI3 (GA_helper):
 
     def getModel_FD(self, dna):
         import model_FD
-        m = model_FD.model(nx, nz, dx, dz) 
+        m = model_FD.model(self.modelGeom.nx, self.modelGeom.nz, self.modelGeom.dx, self.modelGeom.dz) 
        
         interface_num = 0
         current_v = interfaces[interface_num][1]
@@ -798,6 +799,85 @@ class GA_helperI3 (GA_helper):
         
         return [dna1, dna2]
         
+class GA_helperI4_Constraint_V (GA_constraint):
+    def __init__(self, correct_dna):
+        self.correct_dna = correct_dna
+        self.nlayer = len(correct_dna)
+        self.nx = len(correct_dna[0])
+        self.constr_layer = 0
+        
+    def applyConstraint (self, dna):
+        for i in range(self.nlayer):
+            for j in range(self.nx):
+                if i == self.constr_layer: # first layer
+                    # use correct velocity
+                    dna[i][j][1] = self.correct_dna[i][j][1]
+        
+                
+        return dna
+        
+class GA_helperI4_Constraint_Well_Depth (GA_constraint):
+    def __init__(self, correct_dna):
+        self.correct_dna = correct_dna
+        self.nlayer = len(correct_dna)
+        self.nx = len(correct_dna[0])
+        self.well_pos = int (self.nx/2)
+        
+    def applyConstraint (self, dna):
+        for i in range(self.nlayer):
+            for j in range(self.nx):
+                if j == self.well_pos: 
+                    # use correct depth
+                    dna[i][j][0] = correct_dna[i][j][0]
+        
+                
+        return dna
+        
+
+class GA_helperI4_Constraint_Well (GA_constraint):
+    def __init__(self, correct_dna):
+        self.correct_dna = correct_dna
+        self.nlayer = len(correct_dna)
+        self.nx = len(correct_dna[0])
+        self.well_pos = int (self.nx/2)
+        
+    def applyConstraint (self, dna):
+        for i in range(self.nlayer):
+            for j in range(self.nx):
+                if j == self.well_pos: 
+                    # use correct depth
+                    dna[i][j][0] = correct_dna[i][j][0]
+                    # use correct vel
+                    dna[i][j][1] = correct_dna[i][j][1]
+        
+                
+        return dna
+        
+        
+class GA_helperI4_Constraint_Point (GA_constraint):
+    def __init__(self, correct_dna, v, d):
+        self.correct_dna = correct_dna
+        self.nlayer = len(correct_dna)
+        self.nx = len(correct_dna[0])
+        self.well_pos = int (self.nx/2)
+        self.layer = 0
+        self.v = v
+        self.d = d
+        
+    def applyConstraint (self, dna):
+        for i in range(self.nlayer):
+            for j in range(self.nx):
+                if j == self.well_pos and i == self.layer:
+                    if self.d == True:
+                        # use correct depth
+                        dna[i][j][0] = correct_dna[i][j][0]
+                    if self.v == True:
+                        # use correct vel
+                        dna[i][j][1] = correct_dna[i][j][1]
+        
+                
+        return dna
+        
 class model_FMM:   
     def __init__(self, nlayer, nx, dx, sx=0, sz=0):
         self.nx = nx
@@ -822,21 +902,24 @@ class model_FMM:
             self.interpolators_th.append(th)
             self.interpolators_v.append(v)
             
-    def generateFDModel (self, m):         
+    def generateFDModel (self, modelGeom):         
         self.prepareInterpolators()
+        
+        import model_FD
+        dna_m = model_FD.model(modelGeom.nx, modelGeom.nz, modelGeom.dx, modelGeom.dz) 
        
         vv = []
         thth = []
         for i in range (self.nlayer):  
-            v = numpy.reshape(self.interpolators_v[i](m.x_nodes),(m.nx))
+            v = numpy.reshape(self.interpolators_v[i](dna_m.x_nodes),(dna_m.nx))
 #            print ('v', v)
             vv.append(v)
             
-            th = numpy.reshape(self.interpolators_th[i](m.x_nodes),(m.nx))
+            th = numpy.reshape(self.interpolators_th[i](dna_m.x_nodes),(dna_m.nx))
 #            print ('th', th)
             thth.append(th)
         
-        for i in range(m.nx):
+        for i in range(dna_m.nx):
             layer_num = 0
             
             current_v = vv[layer_num][i]
@@ -847,8 +930,8 @@ class model_FMM:
             next_z = next_z + th
 #            print ('next_z', next_z)
             
-            for j in range (m.nz):                
-                z = j*m.dz
+            for j in range (dna_m.nz):                
+                z = j*dna_m.dz
 #                print ('z', z)
                 if z > next_z:
                     layer_num += 1
@@ -861,37 +944,40 @@ class model_FMM:
                     current_v = vv[layer_num][i]
 #                    print ('current_v', current_v)
                     
-                m.v[i][j] = current_v
+                dna_m.v[i][j] = current_v
     
 #        for i in range(m.nx): 
 #            for j in range (m.nz):  
 #                print (i*m.dx,j*m.dz ,m.v[i][j])
                 
-        return m    
+        return dna_m    
+        
+    def getIndexX (self, x):
+        return round( (x - self.sx)/self.dx)
         
 class GA_helperI4 (GA_helper):   
     
-    def __init__(self, c, gathers, m, win, fast, nlayer, nx, velConstr, thickConstr ):
-        self.init(c, gathers, m, win, fast) 
-        lx = self.c.lx()
+    def __init__(self, modelGeom, gathers, win, fast, nlayer, nx, velConstr, thickConstr ):
+        self.init(modelGeom, gathers, win, fast) 
+        lx = self.modelGeom.lx()
         dx = lx/(nx-1)
-        self.fmm_model = model_FMM(nlayer, nx, dx)
+        self.fmmModel = model_FMM(nlayer, nx, dx)
         
         self._velConstr = velConstr
         self._thickConstr = thickConstr
 
-#        print (self.fmm_model.dx)
+#        print (self.fmmModel.dx)
         self._gatherModelIndex = []
         for shot in range(len(self.gathers)):
            g = self.gathers[shot]   
            min_x = min ([r[0] for r in g.rPos ()])   
            max_x = max ([r[0] for r in g.rPos ()])                 
-           min_ind = round((min_x - self.fmm_model.sx)/(self.fmm_model.dx))
-           max_ind = round((max_x - self.fmm_model.sx)/(self.fmm_model.dx))
+           min_ind = self.fmmModel.getIndexX(min_x)
+           max_ind = self.fmmModel.getIndexX(max_x)
 #           self._gatherModelIndex.append((min_ind, max_ind))
            
            gather_indices = []
-           for j in range(self.fmm_model.nx):
+           for j in range(self.fmmModel.nx):
                if j < min_ind or j > max_ind:
                    continue
                gather_indices.append (j)
@@ -908,38 +994,36 @@ class GA_helperI4 (GA_helper):
         
     def _random_dna(self):
         dna = []
-        for i in range(self.fmm_model.nlayer):
+        for i in range(self.fmmModel.nlayer):
             layer = []
-            for j in range(self.fmm_model.nx):
+            for j in range(self.fmmModel.nx):
                 layer.append([self.random_th(None, i),self.random_v_constr(None, i)])
             dna.append(layer)
         return dna
 
     def getModel_FD(self, dna):
+        fmm_model = copy.deepcopy(self.fmmModel)
 #        print ('dna',dna)
-        for i in range(self.fmm_model.nlayer):
-            for j in range(self.fmm_model.nx):
+        for i in range(fmm_model.nlayer):
+            for j in range(fmm_model.nx):
                 th = dna[i][j][0]
                 v = dna[i][j][1]
 
-                # TODO copy fmm_model!!!!
-                self.fmm_model.v[i][j] = v
-                self.fmm_model.th[i][j] = th
+                fmm_model.v[i][j] = v
+                fmm_model.th[i][j] = th
 
-#        print ('v',self.fmm_model.v)
-#        print ('th',self.fmm_model.th)
+#        print ('v',self.fmmModel.v)
+#        print ('th',self.fmmModel.th)
 
-        import model_FD
-        dna_m = model_FD.model(self.c.nx, self.c.nz, self.c.dh, self.c.dh) 
-        dna_m = self.fmm_model.generateFDModel(dna_m)
+        dna_m = fmm_model.generateFDModel(self.modelGeom)
 #        print ('dna_m.v',dna_m.v)
         return dna_m
             
     def _mutate(self, dna, mutation_chance):      
-        lz = int(self.c.lz())
+        lz = int(self.modelGeom.lz())
         
-        for i in range(self.fmm_model.nlayer):
-            for j in range(self.fmm_model.nx):
+        for i in range(self.fmmModel.nlayer):
+            for j in range(self.fmmModel.nx):
                  if random.random() <= mutation_chance:
                     new_th = self.random_th(dna[i][j][0], i)
                     delta_th = new_th - dna[i][j][0]
@@ -950,7 +1034,7 @@ class GA_helperI4 (GA_helper):
                     dna[i][j][0] = min (dna[i][j][0], lz)
                     
                     # update layer below
-                    if i < (self.fmm_model.nlayer -1):
+                    if i < (self.fmmModel.nlayer -1):
                         dna[i+1][j][0] = dna[i+1][j][0] - delta_th
                         dna[i+1][j][0] = max (dna[i+1][j][0], 0)
                         dna[i+1][j][0] = min (dna[i+1][j][0], lz)
@@ -963,7 +1047,7 @@ class GA_helperI4 (GA_helper):
     def calcFitnessFunc (self, dna):
         dna_m = self.getModel_FD(dna)  
         
-        fitness_func = numpy.zeros(self.fmm_model.nx)     
+        fitness_func = numpy.zeros(self.fmmModel.nx)     
         fitness_gather = []
         for shot in range(len(self.gathers)):
             fitness = self.fitnessGather (dna, dna_m, shot)
@@ -978,7 +1062,7 @@ class GA_helperI4 (GA_helper):
         
     def drawCurves (self, population, last):
        
-        images_path = self.c.path + 'GA_images_evgeny_FMM/'
+        images_path = 'C:\GA\tests\evgeny\GA_images_evgeny_FMM/'
        
         fff = [self.calcFitnessFunc (dna) for dna in population]
         fitness_func = [v[0] for v in fff]
@@ -993,7 +1077,7 @@ class GA_helperI4 (GA_helper):
         
     def checkChild (self, dna1, dna2, child):
 #         fitness_func_child, fintess_gather_child = self.calcFitnessFunc (child)
-#        for j in range(self.fmm_model.nx):
+#        for j in range(self.fmmModel.nx):
 #            if fitness_func_child[j] < fitness_func1[j] or fitness_func_child[j] < fitness_func2[j]:
 #                print ("PROBLEM function")
 #                print ("fitness_func_child", fitness_func_child)
@@ -1043,7 +1127,7 @@ class GA_helperI4 (GA_helper):
         
         child = copy.deepcopy(dna1)
         mixed_index = []
-        for j in range(self.fmm_model.nx):
+        for j in range(self.fmmModel.nx):
             parent = None
             if fitness_func1[j] >= fitness_func2[j]:
                 parent = 1
@@ -1052,7 +1136,7 @@ class GA_helperI4 (GA_helper):
 
             mixed_index.append(parent)
             
-            for i in range(self.fmm_model.nlayer):                        
+            for i in range(self.fmmModel.nlayer):                        
                 for c in range(len(dna1[i][j])):
                     if parent == 1:
                         child[i][j][c] = dna1[i][j][c]
@@ -1069,9 +1153,9 @@ class GA_helperI4 (GA_helper):
         
         child = copy.deepcopy(dna1)
 #        mixed_index = []
-        for j in range(self.fmm_model.nx):
+        for j in range(self.fmmModel.nx):
             parent = weighted_choice_([fitness_func1[j], fitness_func2[j]])
-            for i in range(self.fmm_model.nlayer):                        
+            for i in range(self.fmmModel.nlayer):                        
                 for c in range(len(dna1[i][j])):            
                     if parent == 0:
                         child[i][j][c] = dna1[i][j][c]
@@ -1089,7 +1173,7 @@ class GA_helperI4 (GA_helper):
         pop_size = len(population)
         
         fitness_func_transposed = []
-        for j in range(self.fmm_model.nx):
+        for j in range(self.fmmModel.nx):
             fitness_func_transposed.append([v[j] for v in fitness_func])
             
 #        print ("fitness_func", fitness_func_transposed[0])
@@ -1097,9 +1181,9 @@ class GA_helperI4 (GA_helper):
         new_population = []
         while len (new_population) < pop_size:
             child = copy.deepcopy(population[0])
-            for j in range(self.fmm_model.nx):
+            for j in range(self.fmmModel.nx):
                 parent = weighted_choice_(fitness_func_transposed[j], power, remove_average)                                            
-                for i in range(self.fmm_model.nlayer):  
+                for i in range(self.fmmModel.nlayer):  
                     for c in range(len(child[i][j])):            
                         child[i][j][c] = population[parent][i][j][c]
 
@@ -1111,8 +1195,8 @@ class GA_helperI4 (GA_helper):
     def crossover2(self, dna1, dna2):
         child1 = copy.deepcopy(dna1)
         child2 = copy.deepcopy(dna2)
-        for i in range(self.fmm_model.nlayer):
-            for j in range(self.fmm_model.nx):
+        for i in range(self.fmmModel.nlayer):
+            for j in range(self.fmmModel.nx):
                 for c in range(len(dna1[i][j])):
                     w = random.random()
                     if w < 0.5:
@@ -1127,8 +1211,8 @@ class GA_helperI4 (GA_helper):
     def crossover1(self, dna1, dna2):
         child1 = copy.deepcopy(dna1)
         child2 = copy.deepcopy(dna2)
-        for i in range(self.fmm_model.nlayer):
-            for j in range(self.fmm_model.nx):
+        for i in range(self.fmmModel.nlayer):
+            for j in range(self.fmmModel.nx):
                 w = random.random()
                 if w < 0.5:
                     child1[i][j] = dna1[i][j]
@@ -1140,7 +1224,7 @@ class GA_helperI4 (GA_helper):
         return [child1, child2]
         
     def _crossover(self, dna1, dna2):
-        return self.crossover3(dna1, dna2)
+        return self.crossover4(dna1, dna2)
                 
     def getGatherIndices (self, shot):
         return self._gatherModelIndex [shot]
@@ -1150,7 +1234,7 @@ class GA_helperI4 (GA_helper):
         submodel = []
         for j in gather_indices:
             a = []
-            for i in range(self.fmm_model.nlayer):
+            for i in range(self.fmmModel.nlayer):
                 a.append(dna[i][j])
             submodel.append(a)
 #        print ("shot", shot, "submodel", submodel )
@@ -1225,7 +1309,8 @@ def create_new_population (helper, mutation, weighted_population):
     
     if g_sc != None:
         par_pop = g_sc.parallelize (range(pop_size/childs_count))
-        new_population_ = par_pop.map(lambda i: create_childs (helper, mutation, weighted_population)).collect()
+            
+        new_population_ = par_pop.map(lambda i: create_childs (helper.g_broadcastHelper.value, mutation, weighted_population)).collect()
         new_population = []
         for childs in new_population_:
             for child in childs:
@@ -1317,6 +1402,9 @@ def GA_run_on_population (helper, images_path, population,
 def GA_run (helper, images_path, correct_dna,
         pop_size = 20, generatoin_count = 30, mutation = 0.1):  
     helper.print_info()
+    
+    if g_sc != None:
+        helper.g_broadcastHelper = g_sc.broadcast(helper)
 
     if not os.path.exists(images_path):
         os.makedirs(images_path)

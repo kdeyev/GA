@@ -10,20 +10,57 @@ import numpy
 import matplotlib.pyplot as plt
 import copy
 import os
-import subprocess
 import math
 
 font_size = 60
 global_font = {'fontname':'serif', 'size':str(font_size)}
 
-class model ():
+class modelGeom ():
     def __init__ (self, nx, nz, dx, dz, sx=0, sz=0):
+        self.initGeom (nx, nz, dx, dz, sx, sz)
+                        
+    def initGeom (self, nx, nz, dx, dz, sx=0, sz=0):
         self.nx = nx
         self.nz = nz
         self.dx = dx
         self.dz = dz
         self.sx = sx
         self.sz = sz
+#        self.x_nodes = [i*self.dx + self.sx for i in range (self.nx)]
+#        self.z_nodes = [i*self.dz + self.sz for i in range (self.nz)]
+                        
+                        
+#        print ('nx', self.nx)
+#        print ('nx', self.nz) 
+#        print ('dx', self.dx)
+#        print ('dz', self.dz)
+#        print (self.x_nodes)
+#        print (self.z_nodes)
+#    
+
+    def lx (self):
+        return self.sx + (self.nx-1)*self.dx
+        
+    def lz (self):
+        return self.sz + (self.nz-1)*self.dz
+
+    def getIndex (self, x, z):
+        i = (x - self.sx)/self.dx
+        j = (z - self.sz)/self.dz
+        return [i, j]
+
+    def getCoordByIndex (self, i,j):
+#        assert (i.is_in1teger())
+#        assert (j.is_integer())
+        x = self.sx + i*self.dx
+        z = self.sz + j*self.dz
+        return [x, z]
+
+               
+class model (modelGeom):
+    def __init__ (self, nx, nz, dx, dz, sx=0, sz=0):
+        self.initGeom (nx, nz, dx, dz, sx, sz)
+        
         self.v = numpy.zeros ((nx,nz))
         self.x_nodes = [i*self.dx + self.sx for i in range (self.nx)]
         self.z_nodes = [i*self.dz + self.sz for i in range (self.nz)]
@@ -55,12 +92,6 @@ class model ():
         for i in range (self.nx):
             for j in range (self.nz):
                 self.v[i][j] = v
-
-    def lx (self):
-        return self.sx + (self.nx-1)*self.dx
-        
-    def lz (self):
-        return self.sz + (self.nz-1)*self.dz
 
     def zoom (self, center_x, center_z, lx, lz):      
         center_x = int(center_x/self.dx)*self.dx
@@ -149,18 +180,6 @@ class model ():
             plt.show ()
         plt.gcf().clear()
         plt.close('all')
-
-    def getIndex (self, x, z):
-        i = (x - self.sx)/self.dx
-        j = (z - self.sz)/self.dz
-        return [i, j]
-
-    def getCoordByIndex (self, i,j):
-#        assert (i.is_in1teger())
-#        assert (j.is_integer())
-        x = self.sx + i*self.dx
-        z = self.sz + j*self.dz
-        return [x, z]
         
     def setValue(self, x, z, v):
         [i, j] = self.getIndex (x, z)

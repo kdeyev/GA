@@ -396,87 +396,9 @@ def prepare_gather(c, images_path):
     #    exit()
         gathers.append(g)
     return gathers    
-
-    
-class GA_helperI4_Constraint_V (GA.GA_constraint):
-    def __init__(self, correct_dna):
-        self.correct_dna = correct_dna
-        self.nlayer = len(correct_dna)
-        self.nx = len(correct_dna[0])
-        self.constr_layer = 0
         
-    def applyConstraint (self, dna):
-        for i in range(self.nlayer):
-            for j in range(self.nx):
-                if i == self.constr_layer: # first layer
-                    # use correct velocity
-                    dna[i][j][1] = correct_dna[i][j][1]
         
-                
-        return dna
-        
-class GA_helperI4_Constraint_Well_Depth (GA.GA_constraint):
-    def __init__(self, correct_dna):
-        self.correct_dna = correct_dna
-        self.nlayer = len(correct_dna)
-        self.nx = len(correct_dna[0])
-        self.well_pos = int (self.nx/2)
-        
-    def applyConstraint (self, dna):
-        for i in range(self.nlayer):
-            for j in range(self.nx):
-                if j == self.well_pos: 
-                    # use correct depth
-                    dna[i][j][0] = correct_dna[i][j][0]
-        
-                
-        return dna
-        
-
-class GA_helperI4_Constraint_Well (GA.GA_constraint):
-    def __init__(self, correct_dna):
-        self.correct_dna = correct_dna
-        self.nlayer = len(correct_dna)
-        self.nx = len(correct_dna[0])
-        self.well_pos = int (self.nx/2)
-        
-    def applyConstraint (self, dna):
-        for i in range(self.nlayer):
-            for j in range(self.nx):
-                if j == self.well_pos: 
-                    # use correct depth
-                    dna[i][j][0] = correct_dna[i][j][0]
-                    # use correct vel
-                    dna[i][j][1] = correct_dna[i][j][1]
-        
-                
-        return dna
-        
-class GA_helperI4_Constraint_Point (GA.GA_constraint):
-    def __init__(self, correct_dna, v, d):
-        self.correct_dna = correct_dna
-        self.nlayer = len(correct_dna)
-        self.nx = len(correct_dna[0])
-        self.well_pos = int (self.nx/2)
-        self.layer = 0
-        self.v = v
-        self.d = d
-        
-    def applyConstraint (self, dna):
-        for i in range(self.nlayer):
-            for j in range(self.nx):
-                if j == self.well_pos and i == self.layer:
-                    if self.d == True:
-                        # use correct depth
-                        dna[i][j][0] = correct_dna[i][j][0]
-                    if self.v == True:
-                        # use correct vel
-                        dna[i][j][1] = correct_dna[i][j][1]
-        
-                
-        return dna
-        
-def prepare_helper (c, m, gathers, correct_dna, images_path):
+def prepare_helper (modelGeom, gathers, correct_dna, images_path):
     
     vel_constr = [[1500, 2500],
                   [2500, 3500],
@@ -497,15 +419,15 @@ def prepare_helper (c, m, gathers, correct_dna, images_path):
                 print ("wrong constriant")
                 exit (0)
                 
-    helper = GA.GA_helperI4 (c, gathers, m, 0.00, True, len(correct_dna), len(correct_dna[0]), vel_constr, thick_constr)
+    helper = GA.GA_helperI4 (modelGeom, gathers, 0.00, True, len(correct_dna), len(correct_dna[0]), vel_constr, thick_constr)
     helper.define_FMM_energy_semb()
     
     
     helper.putSpikeToGaters (correct_dna);
       
-#    helper.addConstraint(GA_helperI4_Constraint_Well (correct_dna))
-    helper.addConstraint(GA_helperI4_Constraint_V (correct_dna))
-#    helper.addConstraint(GA_helperI4_Constraint_Point(correct_dna, True, True))
+#    helper.addConstraint(GA.GA_helperI4_Constraint_Well (correct_dna))
+    helper.addConstraint(GA.GA_helperI4_Constraint_V (correct_dna))
+#    helper.addConstraint(GA.GA_helperI4_Constraint_Point(correct_dna, True, True))
         
     correct = helper.fitness(correct_dna)
     print ('Correct answer:', correct)
@@ -513,36 +435,31 @@ def prepare_helper (c, m, gathers, correct_dna, images_path):
     if images_path != None:
         helper.draw (correct_dna, images_path + "correct")
     return helper
-    
-        
-def offset_iteration (c, m, orig_gathers, correct_dna,
+            
+def test_correct_dna (modelGeom, orig_gathers, correct_dna,
         pop_size = 20, generatoin_count = 30, mutation = 0.1, images_path = None): 
 
     if not os.path.exists(images_path):
         os.makedirs(images_path)
         
-    helper = prepare_helper(c,m, orig_gathers, correct_dna, None)
+    helper = prepare_helper(modelGeom, orig_gathers, correct_dna, None)
     print (helper)
         
     # Generate initial population. This will create a list of POP_SIZE strings,
     # each initialized to a sequence of random characters.
     population = helper.random_population(pop_size)
+
+    for j in range(len(correct_dna[0])):
+        for i in range(len(correct_dna)):
+            for c in range(len(correct_dna[i][j])):
+                population[j][i][j][c] = correct_dna[i][j][c]      
     
-    offset_iters = 50
-    offset_step = 100
-    for offset_iter in range (1, offset_iters) :
-        offset = offset_iter * offset_step
-        print ('offset', offset)
-        gathers = mute_offset (orig_gathers, offset, None)
-        helper = prepare_helper(c,m, gathers, correct_dna, None)
-        helper.print_info()
-        population = GA.GA_run_on_population(helper, images_path + 'offset_' + str (offset) + '_', population, generatoin_count, mutation)
-    return population
+    return GA.GA_run_on_population(helper, images_path, population, generatoin_count, mutation)
 
         
 if __name__ == "__main__":
 #    model_path = '//home/cloudera/TRM/acoustic_FD_TRM/tests/evgeny/'
-    model_path = 'C:/Users/kostyad/Google Drive/Phd/Near surface/EAT/TRM/acoustic_FD_TRM/tests/evgeny/'
+    model_path = 'C:/GA/tests/evgeny/'
     if not os.path.exists(model_path):
         os.makedirs(model_path)
     
@@ -550,12 +467,8 @@ if __name__ == "__main__":
     c = model_FD.config(model_path)    
     param_name = c.path + 'param_bw.txt'
     c.readFromFile(param_name)   
-
-    import model_RT
-    model_name = 'model.txt'
-    m = model_RT.VelModel() 
-    m.emptyModel(c.lx()/1000., 0.05, c.lz()/1000., 0.025, 0.025, 0.01)
-    m.writeToFile(model_name)
+    
+    modelGeom  = model_FD.modelGeom (c.nx, c.nz, c.dh, c.dh)
     
     images_path = c.path + 'GA_images_evgeny_FMM/' 
     if not os.path.exists(images_path):
@@ -585,13 +498,13 @@ if __name__ == "__main__":
                    ]
 
                    
-#    offset_iteration (c, m, gathers, correct_dna, 
+#    test_correct_dna (c, m, gathers, correct_dna, 
 #                      pop_size = 100, generatoin_count = 50, mutation = 0.1, images_path = images_path)
-#                   
+                   
     
 
                
-    helper = prepare_helper (c, m, gathers, correct_dna, images_path)  
+    helper = prepare_helper (modelGeom, gathers, correct_dna, images_path)  
 
                    
 #    modelingMultiGatherModel(model_path, helper.getModel_FD(correct_dna))
@@ -610,4 +523,4 @@ if __name__ == "__main__":
 #    exit()
         
     GA.GA_run (helper, images_path, correct_dna,
-        pop_size = 100, generatoin_count = 150, mutation = 0.1)    
+        pop_size = 1000, generatoin_count = 150, mutation = 0.1)    
