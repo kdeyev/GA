@@ -523,4 +523,4 @@ if __name__ == "__main__":
 #    exit()
         
     GA.GA_run (helper, images_path, correct_dna,
-        pop_size = 1000, generatoin_count = 150, mutation = 0.1)    
+        pop_size = 1000, generatoin_count = 1000, mutation = 0.1)    

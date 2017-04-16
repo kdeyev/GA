@@ -20,6 +20,8 @@ def getSparkContext ():
     
     conf = SparkConf()
     conf.setAppName("GA spark")
+    conf.set("spark.ui.enabled", "false" )
+    conf.setMaster("local[15]")
 #        if seisspark_config.local_spark:
 #    conf.setMaster("local")
     sc = SparkContext(conf=conf)
@@ -269,7 +271,7 @@ def weighted_choice_(w, power = 1, remove_average = 0):
   return -99
   
     
-def weighted_choice(items, power = 1, remove_average = 1):
+def weighted_choice(items, power = 1, remove_average = 0):
   """
   Chooses a random element from items, where items is a list of tuples in
   the form (item, weight). weight determines the probability of choosing its
@@ -320,8 +322,6 @@ class GA_helper ():
         self._constraints = []
         self._cache = {}
         self._gatherCache = {}
-
-        self.max_min = -1 # maximization or minimization
         
         
     def addConstraint(self, constraint):
@@ -344,19 +344,13 @@ class GA_helper ():
     def print_info (self):
         print ('Fast Marching Method')
         if self.rt_energy_semb == 0:
-            self.max_min = 0
             print ('Energy')
         if self.rt_energy_semb == 1:
             print ('Semblance')
-            self.max_min = 0
         if self.rt_energy_semb == 2:
             print ('Energy * Semblance')
-            self.max_min = 0
                 
-        if self.max_min == 0:
-            print ('Maximization')
-        if self.max_min == 1:
-            print ('Minimization')
+        print ('Maximization')
 
     def _random_dna(self):
         print ('random_dna not implemented')            
@@ -388,33 +382,77 @@ class GA_helper ():
 #                gather_image_path = image_path + 'gather_' + str(shot)
             self.gathers[shot] = put_spike_FMM (g, tt) 
          
+            
+    def fitnessCache(self, dna, cache, gatherCache, image_path=None):
+        key = str(dna)
+        fitness = 0
+        gater_fitness = []
+        found = None
+
+        found = cache.has_key (key)
+        if found:
+            fitness = cache.get (key)
+        else:
+            dna_m = self.getModel_FD(dna)            
+            for shot in range(len(self.gathers)):
+                val = self.fitnessGatherCache (dna, gatherCache, dna_m, shot, image_path)
+                gater_fitness.append (val)
+                fitness += val [2]
+            
+        return [found, key, fitness, gater_fitness]
+
+    def populateCache (self, val):
+        [found, key, fitness, gater_fitness] = val
+    
+        if found==False:
+            self._cache [key] = fitness
+    
+        for val in gater_fitness:
+            [found, gather_key, gather_fitness] = val
+            if found==False:
+                self._gatherCache [gather_key] = gather_fitness
+
+        return fitness
 
     def fitness(self, dna, image_path=None):
-        key = str(dna)
-        if self._cache.has_key (key):
-#            print ("bingo!")
-            return self._cache.get (key)
+        val = self.fitnessCache(dna, self._cache, self._gatherCache, image_path)
+        return self.populateCache (val)
         
-        fit = self.fitness_(dna, image_path)
-        self._cache [key] = fit
-        return fit
+    def fitnessCalc(self, dna, image_path=None):
+        fitness = 0
+        dna_m = self.getModel_FD(dna)            
+        for shot in range(len(self.gathers)):
+            fitness += self.fitnessGather (dna, dna_m, shot, image_path)
+                
+        return fitness
         
-    def fitness_(self, dna, image_path=None):
-        fd_info = None
-        fitness = self.__fitness_FMM(dna, image_path)
+    def fitnessGatherCache(self, dna, gatherCache, dna_m, shot, image_path=None):
+        gather_key = self.getGatherCacheKey (shot, dna)
+        gather_fitness = None
+        found = gatherCache.has_key (gather_key)
+        
+        if found:
+            gather_fitness = gatherCache.get(gather_key)
+        else:            
+            gather_fitness = self.fitnessCalcGather(dna, dna_m, shot, image_path)
             
-        return fitness, fd_info
+        return [found, gather_key, gather_fitness]
         
     def fitnessGather(self, dna, dna_m, shot, image_path=None):
-        return self.__fitness_FMM_gather(dna, dna_m, shot, image_path)
-        
-    def __fitness_FMM_gather(self, dna, dna_m, shot, image_path=None):
-        g = self.gathers[shot]
-
-        gather_key = self.getGatherCache (shot, dna)
+        gather_key = self.getGatherCacheKey (shot, dna)
         if gather_key != None and self._gatherCache.has_key (gather_key):
             return self._gatherCache.get(gather_key)
             
+        [found, gather_key, gather_fitness] = self.fitnessGatherCache(dna, self._gatherCache, dna_m, shot, image_path)
+        
+        if found==False:
+            self._gatherCache [gather_key] = gather_fitness
+
+        return gather_fitness
+        
+    def fitnessCalcGather(self, dna, dna_m, shot, image_path=None):
+        g = self.gathers[shot]
+
         gather_image_path = None
         if image_path != None and self.draw_gathers:
             gather_image_path = image_path + 'gather_' + str(shot)
@@ -428,19 +466,8 @@ class GA_helper ():
         if self.rt_energy_semb == 2:
             gather_fitness = semb * energy
 
-        self._gatherCache[gather_key] = gather_fitness
-                
         return gather_fitness
  
-
-    def __fitness_FMM(self, dna, image_path=None):
-        fitness = 0
-        dna_m = self.getModel_FD(dna)            
-        for shot in range(len(self.gathers)):
-            fitness += self.__fitness_FMM_gather (dna, dna_m, shot, image_path)
-                
-        return fitness
-            
     def getModel(self, dna):
         return self.getModel_FD(dna)            
             
@@ -456,55 +483,34 @@ class GA_helper ():
         return dna
     
     def weight (self, population):
-        if self.max_min == 0:
-            return self.__weight_max (population)
-        else:
-            throw (42)
         
-    def __weight_max (self, population):
+        print ("cache size ", len(self._cache))
+        print ("gather cache size ", len(self._gatherCache))
+        
         if g_sc != None:
-            par_pop = g_sc.parallelize (population)
-            weighted_population = par_pop.map(lambda dna: [dna, self.g_broadcastHelper.value.fitness(dna)[0], None]).collect()
+            par_pop = g_sc.parallelize (population)       
+            vals = par_pop.map(lambda dna: [dna, self.g_broadcastHelper.value.fitnessCache(dna, self._cache, self._gatherCache)]).collect()
+            weighted_population = []
+            for [dna, val] in vals:
+                fitness = self.populateCache (val)
+                weighted_population.append ([dna, fitness])
         else:   
             # Add individuals and their respective fitness levels to the weighted
             # population list. This will be used to pull out individuals via certain
             # probabilities during the selection phase. Then, reset the population list
             # so we can repopulate it after selection.
-            weighted_population = [[dna, self.fitness(dna)[0], None] for dna in population]
+            weighted_population = [[dna, self.fitness(dna)] for dna in population]
                                     
-        return weighted_population
-        
-#    def __weight_min (self, population):
-#        weighted_population = []
-#
-#        # Add individuals and their respective fitness levels to the weighted
-#        # population list. This will be used to pull out individuals via certain
-#        # probabilities during the selection phase. Then, reset the population list
-#        # so we can repopulate it after selection.
-#        for individual in population:
-#            max_weight = 100000000000000000
-#            fitness_val, info = self.fitness(individual)
-#            
-#            
-#            # not we will accidently divide by zero.
-#            if fitness_val == 0:
-#                pair = (individual, max_weight, info)
-#            else:
-#                assert (1.0/fitness_val<max_weight)
-#                pair = (individual, 1.0/fitness_val, info)
-# 
-#            weighted_population.append(pair)
-#        return weighted_population
-    
+        return weighted_population 
         
     def getBest(self, weighted_population):
-        (best_ind, maximum_weight, best_fitness) = weighted_population[0]
+        (best_ind, maximum_weight) = weighted_population[0]
                 
         for i in range(len(weighted_population)):
             if weighted_population[i][1] >= maximum_weight:
-                (best_ind, maximum_weight, best_fitness) = weighted_population[i]
+                (best_ind, maximum_weight) = weighted_population[i]
                 
-        return (best_ind, maximum_weight, best_fitness)
+        return (best_ind, maximum_weight)
         
 #    def print_weight (self, weighted_population) :      
 #        for i in range(len(weighted_population)):
@@ -520,7 +526,7 @@ class GA_helper ():
     def draw (self, individual, images_path):
         #print ('individual',individual)
 #        dna_m = self.getModel_FD(individual)
-        fitness, info = self.fitness (individual, image_path=images_path)
+        fitness = self.fitness (individual, image_path=images_path)
         
         dna_m = self.getModel_FD(individual)
         dna_m.draw ('', images_path +'_model.png', min_ = 1500, max_=5000)
@@ -533,14 +539,14 @@ class GA_helper ():
                     gather_image_path = images_path + 'gather_' + str(shot)
                     g.draw (tt = tt, figure_name = gather_image_path + '.png')
                     
-        return fitness, info 
+        return fitness 
   
 
-    def _crossover(self, dna1, dna2):
+    def _crossover(self, dna1, dna2, gatherCache):
         print ('_crossover not implemented')
         
-    def crossover(self, dna1, dna2):  
-        childs = self._crossover(dna1, dna2)
+    def crossover(self, dna1, dna2, gatherCache):  
+        childs = self._crossover(dna1, dna2, gatherCache)
         for i in range(len(childs)):
             childs[i] = self.applyConstraints(childs[i])
         return childs
@@ -589,12 +595,17 @@ class GA_helperI1 (GA_helper):
         
         dna = [z1, v1, v2]
         return dna
-
-    ## PROXY
+      
     def fitness(self, dna, image_path=None):            
-        fitness_val, info = self.fitness_(dna, image_path)
-        return fitness_val, info
+        key = str(dna)
+        if self._cache.has_key (key):
+#            print ("bingo!")
+            return self._cache.get (key)
         
+        fitness = self.fitnessCalc(dna, image_path)
+        self._cache [key] = fitness
+        return fitness
+            
     @staticmethod
     def fillModel1 (m, z1, v1, v2):  
         for i in range (m.nx):
@@ -1044,18 +1055,21 @@ class GA_helperI4 (GA_helper):
                
         return dna
         
-    def calcFitnessFunc (self, dna):
+    def calcFitnessFunc (self, dna, gatherCache):
         dna_m = self.getModel_FD(dna)  
         
         fitness_func = numpy.zeros(self.fmmModel.nx)     
         fitness_gather = []
         for shot in range(len(self.gathers)):
-            fitness = self.fitnessGather (dna, dna_m, shot)
-            fitness_gather.append (fitness)
+            [found, gather_key, gather_fitness] = self.fitnessGatherCache (dna, gatherCache, dna_m, shot)
+#            if found==False:
+#                self._gatherCache [gather_key] = gather_fitness
+
+            fitness_gather.append (gather_fitness)
             
             gather_indices = self.getGatherIndices (shot)
             for j in gather_indices:
-                fitness_func [j] += fitness
+                fitness_func [j] += gather_fitness
             
         return fitness_func, fitness_gather
 
@@ -1075,53 +1089,53 @@ class GA_helperI4 (GA_helper):
         exit (0)
  
         
-    def checkChild (self, dna1, dna2, child):
-#         fitness_func_child, fintess_gather_child = self.calcFitnessFunc (child)
-#        for j in range(self.fmmModel.nx):
-#            if fitness_func_child[j] < fitness_func1[j] or fitness_func_child[j] < fitness_func2[j]:
-#                print ("PROBLEM function")
-#                print ("fitness_func_child", fitness_func_child)
-#                print ("fitness_func1", fitness_func1)
-#                print ("fitness_func2", fitness_func2)
-#                print ("mixed_index", mixed_index)
-#                exit (1)
+#    def checkChild (self, dna1, dna2, child):
+##         fitness_func_child, fintess_gather_child = self.calcFitnessFunc (child)
+##        for j in range(self.fmmModel.nx):
+##            if fitness_func_child[j] < fitness_func1[j] or fitness_func_child[j] < fitness_func2[j]:
+##                print ("PROBLEM function")
+##                print ("fitness_func_child", fitness_func_child)
+##                print ("fitness_func1", fitness_func1)
+##                print ("fitness_func2", fitness_func2)
+##                print ("mixed_index", mixed_index)
+##                exit (1)
+#        
+#        fitness_child = self.fitness(child)
+#        fitness1 = self.fitness(dna1)
+#        fitness2 = self.fitness(dna2)
+#        if fitness_child < fitness1 or fitness_child < fitness2:
+##            print ("PROBLEM", fitness_child)
+#            
+##            print ("fitness_child", fitness_child)
+##            print ("fitness1", fitness1)
+##            print ("fitness2", fitness2)
+##            print ("")
+##            print ("fitness_func_child", fitness_func_child)
+##            print ("fitness_func1", fitness_func1)
+##            print ("fitness_func2", fitness_func2)
+##            print ("")
+##            print ("fitness_func_child", sum(fitness_func_child))
+##            print ("fitness_func1", sum(fitness_func1))
+##            print ("fitness_func2", sum(fitness_func2))
+##            print ("")
+##            print ("fintess_gather_child", fintess_gather_child)
+##            print ("fitness_gather1", fitness_gather1)
+##            print ("fitness_gather2", fitness_gather2)
+##            print ("")
+##            print ("mixed_index", mixed_index)
+##            exit (1)
+##            throw (42)
+#            if fitness1 > fitness2:
+#                return [dna1]
+#            else:
+#                return [dna2]
+#        else:
+##            print ("NORM", fitness_child)
+#            return [child]      
         
-        fitness_child = self.fitness(child)[0]
-        fitness1 = self.fitness(dna1)[0]
-        fitness2 = self.fitness(dna2)[0]
-        if fitness_child < fitness1 or fitness_child < fitness2:
-#            print ("PROBLEM", fitness_child)
-            
-#            print ("fitness_child", fitness_child)
-#            print ("fitness1", fitness1)
-#            print ("fitness2", fitness2)
-#            print ("")
-#            print ("fitness_func_child", fitness_func_child)
-#            print ("fitness_func1", fitness_func1)
-#            print ("fitness_func2", fitness_func2)
-#            print ("")
-#            print ("fitness_func_child", sum(fitness_func_child))
-#            print ("fitness_func1", sum(fitness_func1))
-#            print ("fitness_func2", sum(fitness_func2))
-#            print ("")
-#            print ("fintess_gather_child", fintess_gather_child)
-#            print ("fitness_gather1", fitness_gather1)
-#            print ("fitness_gather2", fitness_gather2)
-#            print ("")
-#            print ("mixed_index", mixed_index)
-#            exit (1)
-#            throw (42)
-            if fitness1 > fitness2:
-                return [dna1]
-            else:
-                return [dna2]
-        else:
-#            print ("NORM", fitness_child)
-            return [child]      
-        
-    def crossover3(self, dna1, dna2):
-        fitness_func1, fitness_gather1 = self.calcFitnessFunc (dna1)
-        fitness_func2, fitness_gather2 = self.calcFitnessFunc (dna2)
+    def crossover3(self, dna1, dna2, gatherCache):
+        fitness_func1, fitness_gather1 = self.calcFitnessFunc (dna1, gatherCache)
+        fitness_func2, fitness_gather2 = self.calcFitnessFunc (dna2, gatherCache)
 #        print ("fitness_func1", fitness_func1)
 #        print ("fitness_func2", fitness_func2)
         
@@ -1143,11 +1157,12 @@ class GA_helperI4 (GA_helper):
                     else:
                         child[i][j][c] = dna2[i][j][c]
 
-        return self.checkChild (dna1,dna2,child)
+        return [child]    
+#        return self.checkChild (dna1,dna2,child)
 
-    def crossover4(self, dna1, dna2):
-        fitness_func1, fitness_gather1 = self.calcFitnessFunc (dna1)
-        fitness_func2, fitness_gather2 = self.calcFitnessFunc (dna2)
+    def crossover4(self, dna1, dna2, gatherCache):
+        fitness_func1, fitness_gather1 = self.calcFitnessFunc (dna1, gatherCache)
+        fitness_func2, fitness_gather2 = self.calcFitnessFunc (dna2, gatherCache)
 #        print ("fitness_func1", fitness_func1)
 #        print ("fitness_func2", fitness_func2)
         
@@ -1162,7 +1177,8 @@ class GA_helperI4 (GA_helper):
                     if parent == 1:
                         child[i][j][c] = dna2[i][j][c]
 
-        return self.checkChild (dna1,dna2,child)
+        return [child]   
+#        return self.checkChild (dna1,dna2,child)
         
     
     def crossoverPolygam(self, population, power = 1, remove_average = 1):
@@ -1223,13 +1239,13 @@ class GA_helperI4 (GA_helper):
 
         return [child1, child2]
         
-    def _crossover(self, dna1, dna2):
-        return self.crossover4(dna1, dna2)
+    def _crossover(self, dna1, dna2, gatherCache):
+        return self.crossover4(dna1, dna2, gatherCache)
                 
     def getGatherIndices (self, shot):
         return self._gatherModelIndex [shot]
 
-    def getGatherCache (self, shot, dna):
+    def getGatherCacheKey (self, shot, dna):
         gather_indices = self.getGatherIndices (shot)
         submodel = []
         for j in gather_indices:
@@ -1241,7 +1257,7 @@ class GA_helperI4 (GA_helper):
         return str(shot) + str(submodel)
 
 def GA_test (helper, dna, pop_size, mutation = 0.1):
-    correct = helper.fitness(dna)[0]
+    correct = helper.fitness(dna)
     correct = helper.applyConstraints(correct)
     print ('Correct answer:', correct)
     
@@ -1249,7 +1265,7 @@ def GA_test (helper, dna, pop_size, mutation = 0.1):
         dna = helper.mutate(dna, mutation)
         
 #        print(dna)
-        fit = helper.fitness(dna)[0]
+        fit = helper.fitness(dna)
 #        print (dna, fit)
 #        print(i)
         if fit > correct:
@@ -1258,12 +1274,12 @@ def GA_test (helper, dna, pop_size, mutation = 0.1):
         
  
 #def MonteCarlo (helper, correct_dna, pop_size, mutation = 0.1):
-#    correct = helper.fitness(correct_dna)[0]
+#    correct = helper.fitness(correct_dna)
 #    print ('Correct answer:', correct)
 #    
 #    best_dna = helper.random_dna()
 #    
-#    best_fit = helper.fitness(best_dna)[0]
+#    best_fit = helper.fitness(best_dna)
 #    
 #    for i in range(pop_size):
 #        
@@ -1272,7 +1288,7 @@ def GA_test (helper, dna, pop_size, mutation = 0.1):
 #        else:
 #            new_dna = helper.random_dna()
 #            
-#        new_fit = helper.fitness(new_dna)[0]
+#        new_fit = helper.fitness(new_dna)
 ##        print (dna, fit)
 #        if new_fit > best_fit:
 #            best_dna = new_dna
@@ -1283,13 +1299,13 @@ def GA_test (helper, dna, pop_size, mutation = 0.1):
 # Main driver
 # Generate a population and simulate GENERATIONS generations.
 #
-def create_childs (helper, mutation, weighted_population):
+def create_childs (helper, mutation, weighted_population, gatherCache):
     # Selection
     ind1 = weighted_choice(weighted_population)
     ind2 = weighted_choice(weighted_population)
 
     # Crossover
-    childs = helper.crossover(ind1, ind2)
+    childs = helper.crossover(ind1, ind2, gatherCache)
     
     for i in range(len(childs)):
         # Mutate and add back into the population.
@@ -1304,13 +1320,13 @@ def create_new_population (helper, mutation, weighted_population):
     # TEST child count
     ind1 = weighted_choice(weighted_population)
     ind2 = weighted_choice(weighted_population)
-    childs = helper.crossover(ind1, ind2)
+    childs = helper.crossover(ind1, ind2, helper._gatherCache)
     childs_count = len (childs)
     
     if g_sc != None:
         par_pop = g_sc.parallelize (range(pop_size/childs_count))
             
-        new_population_ = par_pop.map(lambda i: create_childs (helper.g_broadcastHelper.value, mutation, weighted_population)).collect()
+        new_population_ = par_pop.map(lambda i: create_childs (helper.g_broadcastHelper.value, mutation, weighted_population, helper._gatherCache)).collect()
         new_population = []
         for childs in new_population_:
             for child in childs:
@@ -1321,7 +1337,7 @@ def create_new_population (helper, mutation, weighted_population):
         # their genes over at a random point, mutate them, and add them back to the
         # population for the next iteration.
         while len (new_population) < pop_size:
-            childs = create_childs (helper, mutation, weighted_population)
+            childs = create_childs (helper, mutation, weighted_population, helper._gatherCache)
             for child in childs:
                 new_population.append(child)
     #            print ("after crosover")
@@ -1344,18 +1360,18 @@ def GA_run_on_population (helper, images_path, population,
     weighted_population = helper.weight (population)
 
     best_generation = 0
-    (global_best_ind, global_maximum_weight, global_best_fitness) = helper.getBest(weighted_population)
+    (global_best_ind, global_best_fitness) = helper.getBest(weighted_population)
     
     print ('Init')
 #    helper.print_weight (weighted_population)
-    print ("global best individual", global_best_ind, global_maximum_weight, global_best_fitness)
+    print ("global best individual", global_best_ind, global_best_fitness)
     
     # print start point
     helper.draw (global_best_ind, images_path + "start")
 
     convergence_best_func = []
     convergence_best_func.append (0)
-#    convergence_best_func.append (global_maximum_weight)
+#    convergence_best_func.append (global_best_fitness)
 
     convergence_aver_func = []
     convergence_aver_func.append (0)
@@ -1367,12 +1383,11 @@ def GA_run_on_population (helper, images_path, population,
         population = create_new_population (helper, mutation, weighted_population)
             
         weighted_population = helper.weight (population)    
-        (local_best_ind, local_maximum_weight, best_fitness) = helper.getBest(weighted_population)
+        (local_best_ind, local_maximum_fitness) = helper.getBest(weighted_population)
         
-        if local_maximum_weight > global_maximum_weight:
+        if local_maximum_fitness > global_best_fitness:
             global_best_ind = local_best_ind
-            global_maximum_weight = local_maximum_weight
-            global_best_fitness = best_fitness
+            global_best_fitness = local_maximum_fitness
             best_generation = generation
             print ("new global best!")
             helper.draw (local_best_ind, images_path + 'iter_' + str(generation))
@@ -1382,13 +1397,13 @@ def GA_run_on_population (helper, images_path, population,
         print ('Generation', generation)
 #        helper.print_weight (weighted_population)
 
-        print ("global best individual", best_generation, global_maximum_weight, global_best_fitness)
-        print ("local best individual", local_maximum_weight, best_fitness)
+        print ("global best individual", best_generation, global_best_fitness)
+        print ("local best individual", local_maximum_fitness)
             
         weight_aver = sum((item[1] for item in weighted_population))/len(weighted_population)
         print ("Total weight", weight_aver)
 
-        convergence_best_func.append (local_maximum_weight)
+        convergence_best_func.append (local_maximum_fitness)
         convergence_aver_func.append (weight_aver)
         if generation % 10 == 0:
             import model_FD
@@ -1404,7 +1419,8 @@ def GA_run (helper, images_path, correct_dna,
     helper.print_info()
     
     if g_sc != None:
-        helper.g_broadcastHelper = g_sc.broadcast(helper)
+        helper_spark = copy.deepcopy (helper)
+        helper.g_broadcastHelper = g_sc.broadcast(helper_spark)
 
     if not os.path.exists(images_path):
         os.makedirs(images_path)
