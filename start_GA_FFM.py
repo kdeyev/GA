@@ -219,71 +219,71 @@ def testEntropy (helper, figure_name):
     
     exit ()
  
-    
-def testObjective (helper, correct_dna, figure_name=None):
-    correct_fitness, correct_info = helper.fitness(correct_dna)
-    print ('correct', correct_dna, correct_fitness, correct_info)
-    
-    lz = 60
-    dz = 10
-    nz = lz/dz
-    
-    lv1 = 500
-    dv1 = 100
-    nv1 = lv1/dv1
-
-    lv2 = 500
-    dv2 = 100
-    nv2 = lv2/dv2
-    
-    import numpy
-    cube = numpy.zeros((2*nz+1,2*nv2+1,2*nv1+1))
-    
-    
-    import copy
-    info_cubes = {}
-    for k in correct_info.keys():
-#        print (k)
-        info_cubes[k] = copy.deepcopy(cube)
-    
-    
-    for z in range(-nz,nz+1):
-        for v1 in range(-nv1,nv1+1):
-            for v2 in range(-nv2,nv2+1):
-                dna = [correct_dna[0]+z*dz, correct_dna[1]+v1*dv1, correct_dna[2]+v2*dv2]
-#                fitness = [0]
-                fitness, info = helper.fitness(dna)
-                cube[z+nz][v2+nv2][v1+nv1]=fitness/correct_fitness/2
-    
-#                if fitness < correct_fitness:
-#                    print ('wrong', dna, fitness, info)
-    
-#                print(dna, info)
-                for k in correct_info.keys():
-                    correct_value = correct_info[k]
-                    value = info[k]
-                    c = info_cubes[k]
-                    c[z+nz][v2+nv2][v1+nv1]=value/correct_value/2
-
-    z = numpy.arange(correct_dna[0]-nz*dz,correct_dna[0]+nz*dz + dz,dz)
-#    print (z)
-    v1 = numpy.arange(correct_dna[1]-nv1*dv1,correct_dna[1]+nv1*dv1 + dv1,dv1)
-#    print (v1)
-    v2 = numpy.arange(correct_dna[2]-nv2*dv2,correct_dna[2]+nv2*dv2 + dv2,dv2)
-#    print (v2)
-    GA.plotcube (cube,v1,v2,z,
-              x_label = 'V1',
-              y_label = 'V2',
-              z_label = 'Z',
-              figure_name = figure_name+'cube.png')
-    
-    for k in info_cubes.keys():
-        c = info_cubes[k]
-        GA.plotcube (c,v1,v2,z,
-              x_label = 'V1',
-              y_label = 'V2',
-              z_label = 'Z',
-              figure_name = figure_name + k + '.png')
+#    
+#def testObjective (helper, correct_dna, figure_name=None):
+#    correct_fitness, correct_info = helper.fitness(correct_dna)
+#    print ('correct', correct_dna, correct_fitness, correct_info)
+#    
+#    lz = 60
+#    dz = 10
+#    nz = lz/dz
+#    
+#    lv1 = 500
+#    dv1 = 100
+#    nv1 = lv1/dv1
+#
+#    lv2 = 500
+#    dv2 = 100
+#    nv2 = lv2/dv2
+#    
+#    import numpy
+#    cube = numpy.zeros((2*nz+1,2*nv2+1,2*nv1+1))
+#    
+#    
+#    import copy
+#    info_cubes = {}
+#    for k in correct_info.keys():
+##        print (k)
+#        info_cubes[k] = copy.deepcopy(cube)
+#    
+#    
+#    for z in range(-nz,nz+1):
+#        for v1 in range(-nv1,nv1+1):
+#            for v2 in range(-nv2,nv2+1):
+#                dna = [correct_dna[0]+z*dz, correct_dna[1]+v1*dv1, correct_dna[2]+v2*dv2]
+##                fitness = [0]
+#                individ = helper.fitness(Individ(dna))
+#                cube[z+nz][v2+nv2][v1+nv1]=fitness/correct_fitness/2
+#    
+##                if fitness < correct_fitness:
+##                    print ('wrong', dna, fitness, info)
+#    
+##                print(dna, info)
+#                for k in correct_info.keys():
+#                    correct_value = correct_info[k]
+#                    value = info[k]
+#                    c = info_cubes[k]
+#                    c[z+nz][v2+nv2][v1+nv1]=value/correct_value/2
+#
+#    z = numpy.arange(correct_dna[0]-nz*dz,correct_dna[0]+nz*dz + dz,dz)
+##    print (z)
+#    v1 = numpy.arange(correct_dna[1]-nv1*dv1,correct_dna[1]+nv1*dv1 + dv1,dv1)
+##    print (v1)
+#    v2 = numpy.arange(correct_dna[2]-nv2*dv2,correct_dna[2]+nv2*dv2 + dv2,dv2)
+##    print (v2)
+#    GA.plotcube (cube,v1,v2,z,
+#              x_label = 'V1',
+#              y_label = 'V2',
+#              z_label = 'Z',
+#              figure_name = figure_name+'cube.png')
+#    
+#    for k in info_cubes.keys():
+#        c = info_cubes[k]
+#        GA.plotcube (c,v1,v2,z,
+#              x_label = 'V1',
+#              y_label = 'V2',
+#              z_label = 'Z',
+#              figure_name = figure_name + k + '.png')
 
 
 def prepare_gather_mute_direct_offset(c, images_path ):
@@ -422,18 +422,17 @@ def prepare_helper (modelGeom, gathers, correct_dna, images_path):
     helper = GA.GA_helperI4 (modelGeom, gathers, 0.00, True, len(correct_dna), len(correct_dna[0]), vel_constr, thick_constr)
     helper.define_FMM_energy_semb()
     
-    
-    helper.putSpikeToGaters (correct_dna);
+    helper.putSpikeToGathers (correct_dna);
       
 #    helper.addConstraint(GA.GA_helperI4_Constraint_Well (correct_dna))
     helper.addConstraint(GA.GA_helperI4_Constraint_V (correct_dna))
 #    helper.addConstraint(GA.GA_helperI4_Constraint_Point(correct_dna, True, True))
         
-    correct = helper.fitness(correct_dna)
-    print ('Correct answer:', correct)
+    individ = helper.fitness(helper.createIndivid(correct_dna))
+    print ('Correct answer:', individ.fitness)
  
     if images_path != None:
-        helper.draw (correct_dna, images_path + "correct")
+        helper.draw (individ, images_path + "correct")
     return helper
             
 def test_correct_dna (modelGeom, orig_gathers, correct_dna,
@@ -459,7 +458,8 @@ def test_correct_dna (modelGeom, orig_gathers, correct_dna,
         
 if __name__ == "__main__":
 #    model_path = '//home/cloudera/TRM/acoustic_FD_TRM/tests/evgeny/'
-    model_path = 'C:/GA/tests/evgeny/'
+#    model_path = 'C:/GA/tests/evgeny/'
+    model_path = "C:/Users/kostyad/Google Drive/Phd/Near surface/EAT/TRM/acoustic_FD_TRM/tests/evgeny/"
     if not os.path.exists(model_path):
         os.makedirs(model_path)
     

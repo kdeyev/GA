@@ -265,21 +265,22 @@ def weighted_choice_(w, power = 1, remove_average = 0):
     if n < weight:
       return i
     n = n - weight
-    
+
+  return len(w)-1
   print ("weighted_choice problem")
   exit (0)
   return -99
   
     
-def weighted_choice(items, power = 1, remove_average = 0):
+def weighted_choice(population, power = 1, remove_average = 0):
   """
   Chooses a random element from items, where items is a list of tuples in
   the form (item, weight). weight determines the probability of choosing its
   respective item. Note: this function is borrowed from ActiveState Recipes.
   """
-  w = [item[1] for item in items]
+  w = [individ.fitness for individ in population]
   num = weighted_choice_(w, power, remove_average)
-  return items[num][0]
+  return population[num]
 
 def bound_random(v, dv, v1, v2):
     rv = 100000
@@ -311,6 +312,23 @@ class GA_constraint ():
         print ('apply_constraint not implemented')
         
        
+    
+class Individ ():
+    def __init__ (self, dna):
+        self.dna = dna
+        self.addToCache = True
+        self.key = str(dna)
+        self.fitness = None
+        self.gather_individs = []
+        self.fitness_func = None
+        
+class GatherIndivid ():
+    def __init__ (self, shot, key=None, fitness=None):
+        self.shot = shot
+        self.addToCache = True
+        self.key = key
+        self.fitness = fitness
+        
 class GA_helper ():   
     
     def init(self, modelGeom, gathers, win, fast):
@@ -327,10 +345,26 @@ class GA_helper ():
     def addConstraint(self, constraint):
         self._constraints.append(constraint)
         
-    def applyConstraints(self, dna):
+    def createIndivid (self, dna):
+        individ = Individ(dna)
+        individ.gather_individs = []
+        for shot in range(len(self.gathers)):
+            key = self.getGatherCacheKey (shot, dna)
+            individ.gather_individs.append(GatherIndivid(shot=shot, key=key))
+        return individ
+        
+    def applyConstraints(self, individ):
+        
+        dna = copy.deepcopy(individ.dna)
         for constraint in self._constraints:
             dna = constraint.applyConstraint(dna)
-        return dna
+            
+        if individ.dna == dna:
+#            print ("applyConstraints: individ was not changed")
+            return individ
+        else:
+#            print ("applyConstraints: individ was changed")
+            return self.createIndivid(dna)
         
     def define_FMM_energy(self):
         self.rt_energy_semb = 0
@@ -352,19 +386,20 @@ class GA_helper ():
                 
         print ('Maximization')
 
-    def _random_dna(self):
-        print ('random_dna not implemented')            
+    def _random_individ(self):
+        print ('random_individ not implemented')            
 
-    def random_dna(self):
-        dna = self._random_dna()
-        dna = self.applyConstraints(dna)
-        return dna
+    def random_individ(self):
+        individ = self.createIndivid(self._random_individ())
+        individ = self.applyConstraints(individ)
+        return individ
         
     def random_population(self, pop_size):
         pop = []
         for i in range(pop_size):       
-            dna = self.random_dna()
-            pop.append(dna)
+            individ = self.random_individ()
+            individ = self.fitness(individ)
+            pop.append(individ)
         return pop
         
     def getTT_FMM(self, g, dna_m):
@@ -372,7 +407,7 @@ class GA_helper ():
 #        print (tt)
         return tt   
         
-    def putSpikeToGaters (self, dna):
+    def putSpikeToGathers (self, dna):
         dna_m = self.getModel_FD(dna)            
         for shot in range(len(self.gathers)):
             g = self.gathers[shot]
@@ -383,90 +418,134 @@ class GA_helper ():
             self.gathers[shot] = put_spike_FMM (g, tt) 
          
             
-    def fitnessCache(self, dna, cache, gatherCache, image_path=None):
-        key = str(dna)
-        fitness = 0
-        gater_fitness = []
-        found = None
-
-        found = cache.has_key (key)
-        if found:
-            fitness = cache.get (key)
-        else:
-            dna_m = self.getModel_FD(dna)            
-            for shot in range(len(self.gathers)):
-                val = self.fitnessGatherCache (dna, gatherCache, dna_m, shot, image_path)
-                gater_fitness.append (val)
-                fitness += val [2]
-            
-        return [found, key, fitness, gater_fitness]
-
-    def populateCache (self, val):
-        [found, key, fitness, gater_fitness] = val
-    
-        if found==False:
-            self._cache [key] = fitness
-    
-        for val in gater_fitness:
-            [found, gather_key, gather_fitness] = val
-            if found==False:
-                self._gatherCache [gather_key] = gather_fitness
-
-        return fitness
-
-    def fitness(self, dna, image_path=None):
-        val = self.fitnessCache(dna, self._cache, self._gatherCache, image_path)
-        return self.populateCache (val)
+    def fitness(self, individ, image_path=None):
+        if individ.fitness != None:
+#            print ("individ: individ already calculated")
+            individ.addToCache=False
+            return individ
         
-    def fitnessCalc(self, dna, image_path=None):
-        fitness = 0
-        dna_m = self.getModel_FD(dna)            
-        for shot in range(len(self.gathers)):
-            fitness += self.fitnessGather (dna, dna_m, shot, image_path)
+        individ.addToCache=True
+#        print ("individ: individ not calculated")
+        
+        dna_m = self.getModel_FD(individ.dna)   
+        individ.fitness = 0
+        for j in range(len(individ.gather_individs)):
+            individ.gather_individs[j] = self.fitnessCalcGather(dna_m, individ.gather_individs[j], image_path)
+            individ.fitness += individ.gather_individs[j].fitness
+            
+        return individ
+
+    def populateCache (self, population):  
+        cache_hit = 0
+        gather_cache_hit = 0
+        for i in range(len(population)):
+            individ = population[i]
+            if individ.key == None:
+                throw (42)
+
+            if individ.addToCache==True:
+                self._cache [individ.key] = individ
+                individ.addToCache=False
+            else:
+                cache_hit = cache_hit + 1
+        
+            for j in range(len(individ.gather_individs)):
+                gather_individ = individ.gather_individs[j]
+
+                if gather_individ.key == None:
+                    throw (42)
                 
-        return fitness
-        
-    def fitnessGatherCache(self, dna, gatherCache, dna_m, shot, image_path=None):
-        gather_key = self.getGatherCacheKey (shot, dna)
-        gather_fitness = None
-        found = gatherCache.has_key (gather_key)
-        
-        if found:
-            gather_fitness = gatherCache.get(gather_key)
-        else:            
-            gather_fitness = self.fitnessCalcGather(dna, dna_m, shot, image_path)
-            
-        return [found, gather_key, gather_fitness]
-        
-    def fitnessGather(self, dna, dna_m, shot, image_path=None):
-        gather_key = self.getGatherCacheKey (shot, dna)
-        if gather_key != None and self._gatherCache.has_key (gather_key):
-            return self._gatherCache.get(gather_key)
-            
-        [found, gather_key, gather_fitness] = self.fitnessGatherCache(dna, self._gatherCache, dna_m, shot, image_path)
-        
-        if found==False:
-            self._gatherCache [gather_key] = gather_fitness
+                if gather_individ.addToCache==True:
+                    self._gatherCache [gather_individ.key] = gather_individ
+                    gather_individ.addToCache=False
+                    individ.gather_individs[j] = gather_individ
+                else:
+                    gather_cache_hit = gather_cache_hit + 1      
+                    
+            population[i] = individ 
+                
+        print ("populateCache: cache_hit", cache_hit, "gather_cache_hit", gather_cache_hit)
+        return population
 
-        return gather_fitness
+    def fillFromCache (self, population):  
+        cache_hit = 0
+        gather_cache_hit = 0
         
-    def fitnessCalcGather(self, dna, dna_m, shot, image_path=None):
-        g = self.gathers[shot]
+#        print ('self._cache.keys', self._cache.keys ())
+        for i in range(len(population)):
+            individ = population[i]
+            if individ.key == None:
+                throw (42)
+                
+#            print ("fillFromCache: individ", individ.fitness)
+            if individ.fitness==None and self._cache.has_key (individ.key):
+                individ = self._cache.get(individ.key)
+                cache_hit = cache_hit + 1               
+        
+                
+            for j in range(len(individ.gather_individs)):
+                gather_individ = individ.gather_individs[j]
+#                print ("fillFromCache: gather_individ", gather_individ.fitness)
+                if gather_individ.key == None:
+                    throw (42)
+                    
+                if gather_individ.fitness==None and self._gatherCache.has_key (gather_individ.key):
+                    gather_individ = self._gatherCache.get(gather_individ.key)
+                    gather_cache_hit = gather_cache_hit + 1               
+                    individ.gather_individs[j] = gather_individ
 
+            population[i] = individ
+                
+        print ("fillFromCache: cache_hit", cache_hit, "gather_cache_hit", gather_cache_hit)
+        return population
+        
+        
+#    def fitnessCalc(self, individ, image_path=None):
+#        individ.fitness = 0
+#        individ.gather_individs = []
+#        dna_m = self.getModel_FD(individ)            
+#        for shot in range(len(self.gathers)):
+#            gather_individ = self.fitnessGather (individ, dna_m, shot, image_path)
+#            individ.gather_individs.append (gather_individ)
+#            individ.fitness += gather_individ.fitness 
+#                
+#        return individ
+        
+#    def fitnessGatherCache(self, dna, gatherCache, dna_m, shot, image_path=None):
+#        gather_key = self.getGatherCacheKey (shot, dna)
+#        gather_individs = None
+#        addToCache = gatherCache.has_key (gather_key)
+#        
+#        if addToCache:
+#            gather_individs = gatherCache.get(gather_key)
+#        else:            
+#            gather_individs = self.fitnessCalcGather(dna_m, shot, image_path)
+#            
+#        return GatherIndivid(shot, addToCache, gather_key, gather_individs)
+        
+        
+    def fitnessCalcGather(self, dna_m, gather_individ, image_path=None):
+        if gather_individ.fitness != None:
+            gather_individ.addToCache = False
+            return gather_individ
+            
+        g = self.gathers[gather_individ.shot]
+
+        gather_individ.addToCache = True
         gather_image_path = None
         if image_path != None and self.draw_gathers:
-            gather_image_path = image_path + 'gather_' + str(shot)
+            gather_image_path = image_path + 'gather_' + str(gather_individ.shot)
         tt = self.getTT_FMM(g, dna_m);
         semb, energy = calc_fit_FMM (g, tt,self.win, self.fast, gather_image_path) 
-        gather_fitness = None
+        gather_individ.fitness  = None
         if self.rt_energy_semb == 0:
-            gather_fitness = energy
+            gather_individ.fitness  = energy
         if self.rt_energy_semb == 1:
-            gather_fitness = semb
+            gather_individ.fitness  = semb
         if self.rt_energy_semb == 2:
-            gather_fitness = semb * energy
+            gather_individ.fitness  = semb * energy
 
-        return gather_fitness
+        return gather_individ
  
     def getModel(self, dna):
         return self.getModel_FD(dna)            
@@ -474,61 +553,61 @@ class GA_helper ():
     def getModel_FD(self, dna):
         print ('getModel not implemented')
     
-    def _mutate(self, dna, mutation_chance):        
+    def _mutate(self, individ, mutation_chance):        
         print ('mutate not implemented')
         
-    def mutate(self, dna, mutation_chance):        
-        dna = self._mutate(dna, mutation_chance)
-        dna = self.applyConstraints(dna)
-        return dna
+    def mutate(self, individ, mutation_chance):        
+        individ = self._mutate(individ, mutation_chance)
+        individ = self.applyConstraints(individ)
+        return individ
     
     def weight (self, population):
         
         print ("cache size ", len(self._cache))
         print ("gather cache size ", len(self._gatherCache))
         
+        population = self.fillFromCache (population)
+
+        # Add individuals and their respective fitness levels to the weighted
+        # population list. This will be used to pull out individuals via certain
+        # probabilities during the selection phase. Then, reset the population list
+        # so we can repopulate it after selection.
+            
         if g_sc != None:
             par_pop = g_sc.parallelize (population)       
-            vals = par_pop.map(lambda dna: [dna, self.g_broadcastHelper.value.fitnessCache(dna, self._cache, self._gatherCache)]).collect()
-            weighted_population = []
-            for [dna, val] in vals:
-                fitness = self.populateCache (val)
-                weighted_population.append ([dna, fitness])
+            population = par_pop.map(lambda individ: [self.g_broadcastHelper.value.fitness(individ)]).collect()
         else:   
-            # Add individuals and their respective fitness levels to the weighted
-            # population list. This will be used to pull out individuals via certain
-            # probabilities during the selection phase. Then, reset the population list
-            # so we can repopulate it after selection.
-            weighted_population = [[dna, self.fitness(dna)] for dna in population]
-                                    
-        return weighted_population 
+            population = [self.fitness(individ) for individ in population]
+                              
+        population = self.populateCache (population)
+        return population 
         
-    def getBest(self, weighted_population):
-        (best_ind, maximum_weight) = weighted_population[0]
+    def getBest(self, population):
+        best_individ = population[0]
                 
-        for i in range(len(weighted_population)):
-            if weighted_population[i][1] >= maximum_weight:
-                (best_ind, maximum_weight) = weighted_population[i]
+        for i in range(len(population)):
+            if population[i].fitness >= best_individ.fitness:
+                best_individ = population[i]
                 
-        return (best_ind, maximum_weight)
+        return best_individ
         
-#    def print_weight (self, weighted_population) :      
-#        for i in range(len(weighted_population)):
-#            print (weighted_population[i])
+#    def print_weight (self, population) :      
+#        for i in range(len(population)):
+#            print (population[i])
 #            
-#        (best_ind, maximum_weight, best_fitness) = self.getBest(weighted_population)
+#        (best_ind, maximum_weight, best_fitness) = self.getBest(population)
 #        
-#        weight_total = sum((item[1] for item in weighted_population))
+#        weight_total = sum((item[1] for item in population))
 #
 #        print ("Best individual", best_ind, maximum_weight, best_fitness)
 #        print ("Total fitness", weight_total)
 
-    def draw (self, individual, images_path):
+    def draw (self, individ, images_path):
         #print ('individual',individual)
 #        dna_m = self.getModel_FD(individual)
-        fitness = self.fitness (individual, image_path=images_path)
+        individ = self.fitness(individ, image_path=images_path)
         
-        dna_m = self.getModel_FD(individual)
+        dna_m = self.getModel_FD(individ.dna)
         dna_m.draw ('', images_path +'_model.png', min_ = 1500, max_=5000)
         
         if self.draw_gathers:
@@ -539,277 +618,278 @@ class GA_helper ():
                     gather_image_path = images_path + 'gather_' + str(shot)
                     g.draw (tt = tt, figure_name = gather_image_path + '.png')
                     
-        return fitness 
+        return individ 
   
 
-    def _crossover(self, dna1, dna2, gatherCache):
+    def _crossover(self, individ1, individ2):
         print ('_crossover not implemented')
         
-    def crossover(self, dna1, dna2, gatherCache):  
-        childs = self._crossover(dna1, dna2, gatherCache)
+    def crossover(self, individ1, individ2):  
+        childs = self._crossover(individ1, individ2)
         for i in range(len(childs)):
             childs[i] = self.applyConstraints(childs[i])
         return childs
-           
-class GA_helperI1 (GA_helper):   
+#           
+#class GA_helperI1 (GA_helper):   
+#
+#    def __init__(self, modelGeom, gathers, win, fast):
+#        self.init(modelGeom, gathers, win,fast)
+#        
+#        self.start_v1 = 1500
+#        self.end_v1 = 5000
+#        self.dv1 = 10
+#        self.start_v2 = 1500
+#        self.end_v2 = 5000
+#        self.dv2 = 10
+#
+#        self.start_z = 50
+#        self.end_z = 250
+#        self.dz = 5
+#        
+#        self.nv1 = int((self.end_v1 - self.start_v1)/self.dv1 + 1)
+#        self.nv2 = int((self.end_v2 - self.start_v2)/self.dv2 + 1)
+#        self.nz = int((self.end_z - self.start_z)/self.dz + 1)
+#        
+##        self.cube = numpy.zeros((self.nz, self.nv2, self.nv1))
+#        
+#        self.z = numpy.arange(self.start_z, self.end_z + self.dz, self.dz)
+#        self.v1 = numpy.arange(self.start_v1, self.end_v1 + self.dv1, self.dv1)
+#        self.v2 = numpy.arange(self.start_v2, self.end_v2 + self.dv2, self.dv2)
+#        
+#        
+#    def random_v1(self,v1 = None):
+#        return round_v(bound_random (v1, 1000, self.start_v1, self.end_v1), self.dv1)
+#  
+#    def random_v2(self,v2 = None):
+#        return round_v(bound_random (v2, 1000, self.start_v2, self.end_v2), self.dv2)
+#        
+#    def random_z1(self,z1 = None):
+#        return round_z(bound_random (z1, 100, self.start_z, self.end_z), self.dz)
+#                       # WARNINNG min depth 50m
+#
+#    def _random_individ(self):
+#        z1 = self.random_z1(125)
+#        v1 = self.random_v1(2000)
+#        v2 = self.random_v2(3500)
+#        
+#        dna = [z1, v1, v2]
+#        return dna
+#      
+##    def fitness(self, dna, image_path=None):            
+##        key = str(dna)
+##        if self._cache.has_key (key):
+###            print ("bingo!")
+##            return self._cache.get (key)
+##        
+##        fitness = self.fitnessCalc(dna, image_path)
+##        self._cache [key] = fitness
+##        return fitness
+#            
+#    @staticmethod
+#    def fillModel1 (m, z1, v1, v2):  
+#        for i in range (m.nx):
+#            for j in range (m.nz):
+#                z = j*m.dz 
+#                v = v1
+#                if (z > z1):
+#                    v = v2
+#                    
+#                m.v[i][j] = v
+#        
+#        return m    
+#    
+#    def getModel_FD(self, dna):
+#        import model_FD
+#        
+#        m = model_FD.model(self.modelGeom.nx, self.modelGeom.nz, self.modelGeom.dx, self.modelGeom.dz)
+#        dna_m = self.fillModel1(m, dna[0], dna[1], dna[2])
+#        return dna_m
+#            
+#    def _mutate(self, individ, mutation_chance):        
+#        dna = copy.deep_copy
+#        for c in range(len(dna)):
+#            if random.random() <= mutation_chance:
+#                if c == 0:
+##                    prev = dna[c]
+#                    dna[c] = self.random_z1(dna[c])
+##                    print ('mutate z1', prev, dna[c])
+#                if c == 1:
+##                    prev = dna[c]
+#                    dna[c] = self.random_v1(dna[c])
+##                    print ('mutate v1', prev, dna[c])
+#                if c == 2:
+##                    prev = dna[c]
+#                    dna[c] = self.random_v2(dna[c])
+##                    print ('mutate v2', prev, dna[c])
+#        
+#        return dna
+#    
+#class GA_helperI2 (GA_helper):   
+#    
+#    def __init__(self, modelGeom, gathers, win, fast):
+#        self.init(modelGeom,gathers, win, fast)
+#
+#    def empty_model (self):
+#        import model_FD
+#        lx = self.modelGeom.lx()
+#        lz = self.modelGeom.lz()
+#        new_dx = 10001
+#        new_dz = 25
+#        
+#        rand_m = model_FD.model(int(lx/new_dx)+1, int(lz/new_dz)+1, new_dx, new_dz)
+#        return rand_m
+#        
+#    def _random_individ(self):
+#        rand_m = self.empty_model()
+#        for i in range (rand_m.nx):
+#            for j in range (rand_m.nz):
+#                rand_m.v[i][j] = self.random_v(2500)
+#                    
+#        return numpy.reshape(rand_m.v,(rand_m.nx*rand_m.nz))
+#        
+#    @staticmethod
+#    def fillModel (m, dna_m):
+##        to_interp = []
+#        for i in range (m.nx):
+#            for j in range (m.nz):
+#                x = i*m.dx
+#                z = j*m.dz
+##                point=[x,z]
+##                to_interp.append(point)
+#                m.v[i][j] = dna_m.getValue(x, z)
+#
+##        fn = dna_m.getInterp()                
+##        m.v =  numpy.reshape(fn(to_interp), (m.nx, m.nz))
+#
+#                
+##        print (m.v)
+#        return m
+#    
+#    def getModel_FD(self, dna):
+#        dna_m = self.empty_model()
+#        dna_m.v = numpy.reshape(dna, (dna_m.nx, dna_m.nz))
+##        print(dna_m.v)
+##        print(dna_m.x_nodes)
+##        print(dna_m.y_nodes)
+##        print(dna_m.z_nodes)
+#        dna_m = self.fillModel(self.m, dna_m)
+##        print(m.v)
+##        print(m.x_nodes)
+##        print(m.y_nodes)
+##        print(m.z_nodes)
+#        return dna_m
+#            
+#    def _mutate(self, dna, mutation_chance):        
+#        for c in range(len(dna)):
+#            if random.random() <= mutation_chance:
+#                dna[c] = random_v(dna[c])
+#                
+#        return dna
+#
+#
+#class GA_helperI3 (GA_helper):   
+#    
+#    def __init__(self, modelGeom, gathers, win, fast):
+#        self.init(modelGeom, gathers, win, fast)
+#        self.layer_count = 3
+#        
+#    def random_z(self, z1 = None):
+#        lz = int(self.modelGeom.lz())
+#        if z1 == None:
+#            z1 = int(lz/2)
+#        return round_z(bound_random (z1, lz, 0, lz))    
+#        
+#    def sort_by_z(self, dna):
+#        for i in range(len(dna)):
+#            for j in range(i+1, len(dna)):
+#                if dna[i][0] > dna[j][0]:
+#                    tmp = dna[i]
+#                    dna[i] = dna[j]
+#                    dna[j] = tmp
+#        return dna
+#            
+#    def _random_individ(self):
+#        dna = [[0, random_v()]]
+#    
+#        for l in range(self.layer_count-1):
+#            dna.append([self.random_z(),random_v()])
+#        return self.sort_by_z(dna)
+#
+#
+##    def getModel_FD(self, dna):
+##        import model_FD
+##        m = model_FD.model(self.modelGeom.nx, self.modelGeom.nz, self.modelGeom.dx, self.modelGeom.dz) 
+##       
+##        interface_num = 0
+##        current_v = interfaces[interface_num][1]
+##        next_z = interfaces[interface_num+1][0]
+##        for j in range (m.nz):                
+##            z = j*dz 
+##            if z > next_z:
+##                interface_num += 1
+##                if interface_num < len (interfaces)-1:
+##                    next_z = interfaces[interface_num+1][0]
+##                else:
+##                    next_z = 10000
+##                    
+##                current_v = interfaces[interface_num][1]  
+##            for i in range (m.nx):
+##                m.v[i][j] = current_v
+##    
+##        return m    
+#            
+#    def _mutate(self, dna, mutation_chance):        
+#        for c in range(len(dna)):   
+#             if random.random() <= mutation_chance:
+#                 if c != 0: # WARNING special case
+#                    dna[c][0] = self.random_z(dna[c][0])
+#             if random.random() <= mutation_chance:
+#                 dna[c][1] = random_v(dna[c][1])                
+#               
+#        dna = self.sort_by_z(dna)
+##        print ('mutate dna', dna)
+#        return dna
+#
+#    def crossover2(self, individ1, individ2):
+#        child1 = []
+#        child2 = []
+#        for c in range(len(individ1.dna)):
+#            child_dna1 = []
+#            child_dna2 = []
+#            w = random.random()
+#            if w < 0.5:
+#                child_dna1.append(individ1.dna[c][0])
+#                child_dna2.append(individ2.dna[c][0])
+#            else:
+#                child_dna1.append(individ2.dna[c][0])
+#                child_dna2.append(individ1.dna[c][0])
+#                
+#            w = random.random()
+#            if w < 0.5:
+#                child_dna1.append(individ1.dna[c][1])
+#                child_dna2.append(individ2.dna[c][1])
+#            else:
+#                child_dna1.append(individ2.dna[c][1])
+#                child_dna2.append(individ1.dna[c][1])
+#                
+#            child1.append(child_dna1)
+#            child2.append(child_dna2)
+#            
+#        child1 = self.sort_by_z(child1)
+#        child2 = self.sort_by_z(child2)
+##        print ('cross parents', individ1, individ2)
+##        print ('cross childs', child1, child2)
+#        return child1, child2
+#        
+#    def _crossover(self, individ1, individ2):
+#        individ1, individ2 = self.crossover2(individ1, individ2)
+#        dna1 = self.sort_by_z(individ1.dna)
+#        dna2 = self.sort_by_z(individ2.dna)
+##        print ('crossover dna1', dna1)
+##        print ('crossover dna2', dna2)
+#        
+#        return [createIndivid(dna1), createIndivid(dna2)]
 
-    def __init__(self, modelGeom, gathers, win, fast):
-        self.init(modelGeom, gathers, win,fast)
-        
-        self.start_v1 = 1500
-        self.end_v1 = 5000
-        self.dv1 = 10
-        self.start_v2 = 1500
-        self.end_v2 = 5000
-        self.dv2 = 10
-
-        self.start_z = 50
-        self.end_z = 250
-        self.dz = 5
-        
-        self.nv1 = int((self.end_v1 - self.start_v1)/self.dv1 + 1)
-        self.nv2 = int((self.end_v2 - self.start_v2)/self.dv2 + 1)
-        self.nz = int((self.end_z - self.start_z)/self.dz + 1)
-        
-#        self.cube = numpy.zeros((self.nz, self.nv2, self.nv1))
-        
-        self.z = numpy.arange(self.start_z, self.end_z + self.dz, self.dz)
-        self.v1 = numpy.arange(self.start_v1, self.end_v1 + self.dv1, self.dv1)
-        self.v2 = numpy.arange(self.start_v2, self.end_v2 + self.dv2, self.dv2)
-        
-        
-    def random_v1(self,v1 = None):
-        return round_v(bound_random (v1, 1000, self.start_v1, self.end_v1), self.dv1)
-  
-    def random_v2(self,v2 = None):
-        return round_v(bound_random (v2, 1000, self.start_v2, self.end_v2), self.dv2)
-        
-    def random_z1(self,z1 = None):
-        return round_z(bound_random (z1, 100, self.start_z, self.end_z), self.dz)
-                       # WARNINNG min depth 50m
-
-    def _random_dna(self):
-        z1 = self.random_z1(125)
-        v1 = self.random_v1(2000)
-        v2 = self.random_v2(3500)
-        
-        dna = [z1, v1, v2]
-        return dna
-      
-    def fitness(self, dna, image_path=None):            
-        key = str(dna)
-        if self._cache.has_key (key):
-#            print ("bingo!")
-            return self._cache.get (key)
-        
-        fitness = self.fitnessCalc(dna, image_path)
-        self._cache [key] = fitness
-        return fitness
-            
-    @staticmethod
-    def fillModel1 (m, z1, v1, v2):  
-        for i in range (m.nx):
-            for j in range (m.nz):
-                z = j*m.dz 
-                v = v1
-                if (z > z1):
-                    v = v2
-                    
-                m.v[i][j] = v
-        
-        return m    
-    
-    def getModel_FD(self, dna):
-        import model_FD
-        
-        m = model_FD.model(self.modelGeom.nx, self.modelGeom.nz, self.modelGeom.dx, self.modelGeom.dz)
-        dna_m = self.fillModel1(m, dna[0], dna[1], dna[2])
-        return dna_m
-            
-    def _mutate(self, dna, mutation_chance):        
-        for c in range(len(dna)):
-            if random.random() <= mutation_chance:
-                if c == 0:
-#                    prev = dna[c]
-                    dna[c] = self.random_z1(dna[c])
-#                    print ('mutate z1', prev, dna[c])
-                if c == 1:
-#                    prev = dna[c]
-                    dna[c] = self.random_v1(dna[c])
-#                    print ('mutate v1', prev, dna[c])
-                if c == 2:
-#                    prev = dna[c]
-                    dna[c] = self.random_v2(dna[c])
-#                    print ('mutate v2', prev, dna[c])
-        
-        return dna
-    
-class GA_helperI2 (GA_helper):   
-    
-    def __init__(self, modelGeom, gathers, win, fast):
-        self.init(modelGeom,gathers, win, fast)
-
-    def empty_model (self):
-        import model_FD
-        lx = self.modelGeom.lx()
-        lz = self.modelGeom.lz()
-        new_dx = 10001
-        new_dz = 25
-        
-        rand_m = model_FD.model(int(lx/new_dx)+1, int(lz/new_dz)+1, new_dx, new_dz)
-        return rand_m
-        
-    def _random_dna(self):
-        rand_m = self.empty_model()
-        for i in range (rand_m.nx):
-            for j in range (rand_m.nz):
-                rand_m.v[i][j] = self.random_v(2500)
-                    
-        return numpy.reshape(rand_m.v,(rand_m.nx*rand_m.nz))
-        
-    @staticmethod
-    def fillModel (m, dna_m):
-#        to_interp = []
-        for i in range (m.nx):
-            for j in range (m.nz):
-                x = i*m.dx
-                z = j*m.dz
-#                point=[x,z]
-#                to_interp.append(point)
-                m.v[i][j] = dna_m.getValue(x, z)
-
-#        fn = dna_m.getInterp()                
-#        m.v =  numpy.reshape(fn(to_interp), (m.nx, m.nz))
-
-                
-#        print (m.v)
-        return m
-    
-    def getModel_FD(self, dna):
-        dna_m = self.empty_model()
-        dna_m.v = numpy.reshape(dna, (dna_m.nx, dna_m.nz))
-#        print(dna_m.v)
-#        print(dna_m.x_nodes)
-#        print(dna_m.y_nodes)
-#        print(dna_m.z_nodes)
-        dna_m = self.fillModel(self.m, dna_m)
-#        print(m.v)
-#        print(m.x_nodes)
-#        print(m.y_nodes)
-#        print(m.z_nodes)
-        return dna_m
-            
-    def _mutate(self, dna, mutation_chance):        
-        for c in range(len(dna)):
-            if random.random() <= mutation_chance:
-                dna[c] = random_v(dna[c])
-                
-        return dna
-
-
-class GA_helperI3 (GA_helper):   
-    
-    def __init__(self, modelGeom, gathers, win, fast):
-        self.init(modelGeom, gathers, win, fast)
-        self.layer_count = 3
-        
-    def random_z(self, z1 = None):
-        lz = int(self.modelGeom.lz())
-        if z1 == None:
-            z1 = int(lz/2)
-        return round_z(bound_random (z1, lz, 0, lz))    
-        
-    def sort_by_z(self, dna):
-        for i in range(len(dna)):
-            for j in range(i+1, len(dna)):
-                if dna[i][0] > dna[j][0]:
-                    tmp = dna[i]
-                    dna[i] = dna[j]
-                    dna[j] = tmp
-        return dna
-            
-    def _random_dna(self):
-        dna = [[0, random_v()]]
-    
-        for l in range(self.layer_count-1):
-            dna.append([self.random_z(),random_v()])
-        return self.sort_by_z(dna)
-
-
-    def getModel_FD(self, dna):
-        import model_FD
-        m = model_FD.model(self.modelGeom.nx, self.modelGeom.nz, self.modelGeom.dx, self.modelGeom.dz) 
-       
-        interface_num = 0
-        current_v = interfaces[interface_num][1]
-        next_z = interfaces[interface_num+1][0]
-        for j in range (m.nz):                
-            z = j*dz 
-            if z > next_z:
-                interface_num += 1
-                if interface_num < len (interfaces)-1:
-                    next_z = interfaces[interface_num+1][0]
-                else:
-                    next_z = 10000
-                    
-                current_v = interfaces[interface_num][1]  
-            for i in range (m.nx):
-                m.v[i][j] = current_v
-    
-        return m    
-            
-    def _mutate(self, dna, mutation_chance):        
-        for c in range(len(dna)):   
-             if random.random() <= mutation_chance:
-                 if c != 0: # WARNING special case
-                    dna[c][0] = self.random_z(dna[c][0])
-             if random.random() <= mutation_chance:
-                 dna[c][1] = random_v(dna[c][1])                
-               
-        dna = self.sort_by_z(dna)
-#        print ('mutate dna', dna)
-        return dna
-
-    def crossover2(self, dna1, dna2):
-        child1 = []
-        child2 = []
-        for c in range(len(dna1)):
-            child_dna1 = []
-            child_dna2 = []
-            w = random.random()
-            if w < 0.5:
-                child_dna1.append(dna1[c][0])
-                child_dna2.append(dna2[c][0])
-            else:
-                child_dna1.append(dna2[c][0])
-                child_dna2.append(dna1[c][0])
-                
-            w = random.random()
-            if w < 0.5:
-                child_dna1.append(dna1[c][1])
-                child_dna2.append(dna2[c][1])
-            else:
-                child_dna1.append(dna2[c][1])
-                child_dna2.append(dna1[c][1])
-                
-            child1.append(child_dna1)
-            child2.append(child_dna2)
-            
-        child1 = self.sort_by_z(child1)
-        child2 = self.sort_by_z(child2)
-#        print ('cross parents', dna1, dna2)
-#        print ('cross childs', child1, child2)
-        return child1, child2
-        
-    def _crossover(self, dna1, dna2):
-        dna1, dna2 = self.crossover2(dna1, dna2)
-        dna1 = self.sort_by_z(dna1)
-        dna2 = self.sort_by_z(dna2)
-#        print ('crossover dna1', dna1)
-#        print ('crossover dna2', dna2)
-        
-        return [dna1, dna2]
-        
 class GA_helperI4_Constraint_V (GA_constraint):
     def __init__(self, correct_dna):
         self.correct_dna = correct_dna
@@ -839,7 +919,7 @@ class GA_helperI4_Constraint_Well_Depth (GA_constraint):
             for j in range(self.nx):
                 if j == self.well_pos: 
                     # use correct depth
-                    dna[i][j][0] = correct_dna[i][j][0]
+                    dna[i][j][0] = self.correct_dna[i][j][0]
         
                 
         return dna
@@ -857,9 +937,9 @@ class GA_helperI4_Constraint_Well (GA_constraint):
             for j in range(self.nx):
                 if j == self.well_pos: 
                     # use correct depth
-                    dna[i][j][0] = correct_dna[i][j][0]
+                    dna[i][j][0] = self.correct_dna[i][j][0]
                     # use correct vel
-                    dna[i][j][1] = correct_dna[i][j][1]
+                    dna[i][j][1] = self.correct_dna[i][j][1]
         
                 
         return dna
@@ -881,10 +961,10 @@ class GA_helperI4_Constraint_Point (GA_constraint):
                 if j == self.well_pos and i == self.layer:
                     if self.d == True:
                         # use correct depth
-                        dna[i][j][0] = correct_dna[i][j][0]
+                        dna[i][j][0] = self.correct_dna[i][j][0]
                     if self.v == True:
                         # use correct vel
-                        dna[i][j][1] = correct_dna[i][j][1]
+                        dna[i][j][1] = self.correct_dna[i][j][1]
         
                 
         return dna
@@ -1003,7 +1083,7 @@ class GA_helperI4 (GA_helper):
     def random_v_constr(self, v, layer):
         return round_v(bound_random_new (self._velConstr[layer][0], self._velConstr[layer][1]))  
         
-    def _random_dna(self):
+    def _random_individ(self):
         dna = []
         for i in range(self.fmmModel.nlayer):
             layer = []
@@ -1030,9 +1110,10 @@ class GA_helperI4 (GA_helper):
 #        print ('dna_m.v',dna_m.v)
         return dna_m
             
-    def _mutate(self, dna, mutation_chance):      
+    def _mutate(self, individ, mutation_chance):      
         lz = int(self.modelGeom.lz())
         
+        dna = copy.deepcopy(individ.dna)
         for i in range(self.fmmModel.nlayer):
             for j in range(self.fmmModel.nx):
                  if random.random() <= mutation_chance:
@@ -1053,32 +1134,34 @@ class GA_helperI4 (GA_helper):
                  if random.random() <= mutation_chance:
                      dna[i][j][1] = self.random_v_constr(dna[i][j][1], i)                
                
-        return dna
+        if individ.dna == dna:
+#            print ("_mutate: individ was not changed")
+            return individ
+        else:
+#            print ("_mutate: individ was changed")
+            return self.createIndivid(dna)
         
-    def calcFitnessFunc (self, dna, gatherCache):
-        dna_m = self.getModel_FD(dna)  
+    def calcFitnessFunc (self, individ):
+        if individ.fitness_func != None:
+            return individ
         
-        fitness_func = numpy.zeros(self.fmmModel.nx)     
-        fitness_gather = []
-        for shot in range(len(self.gathers)):
-            [found, gather_key, gather_fitness] = self.fitnessGatherCache (dna, gatherCache, dna_m, shot)
-#            if found==False:
-#                self._gatherCache [gather_key] = gather_fitness
-
-            fitness_gather.append (gather_fitness)
+        individ = self.fitness (individ)
+        
+        individ.fitness_func = numpy.zeros(self.fmmModel.nx)     
+        for gather_individ in individ.gather_individs:
             
-            gather_indices = self.getGatherIndices (shot)
+            gather_indices = self.getGatherIndices (gather_individ.shot)
             for j in gather_indices:
-                fitness_func [j] += gather_fitness
+                individ.fitness_func [j] += gather_individ.fitness
             
-        return fitness_func, fitness_gather
+        return individ
 
         
     def drawCurves (self, population, last):
        
         images_path = 'C:\GA\tests\evgeny\GA_images_evgeny_FMM/'
        
-        fff = [self.calcFitnessFunc (dna) for dna in population]
+        fff = [self.calcFitnessFunc (individ).fitness_func for individ in population]
         fitness_func = [v[0] for v in fff]
         fitness_gather = [v[1] for v in fff]
         
@@ -1089,7 +1172,7 @@ class GA_helperI4 (GA_helper):
         exit (0)
  
         
-#    def checkChild (self, dna1, dna2, child):
+#    def checkChild (self, individ1, individ2, child):
 ##         fitness_func_child, fintess_gather_child = self.calcFitnessFunc (child)
 ##        for j in range(self.fmmModel.nx):
 ##            if fitness_func_child[j] < fitness_func1[j] or fitness_func_child[j] < fitness_func2[j]:
@@ -1133,17 +1216,17 @@ class GA_helperI4 (GA_helper):
 ##            print ("NORM", fitness_child)
 #            return [child]      
         
-    def crossover3(self, dna1, dna2, gatherCache):
-        fitness_func1, fitness_gather1 = self.calcFitnessFunc (dna1, gatherCache)
-        fitness_func2, fitness_gather2 = self.calcFitnessFunc (dna2, gatherCache)
+    def crossover3(self, individ1, individ2):
+        individ1 = self.calcFitnessFunc (individ1)
+        individ2 = self.calcFitnessFunc (individ2)
 #        print ("fitness_func1", fitness_func1)
 #        print ("fitness_func2", fitness_func2)
         
-        child = copy.deepcopy(dna1)
+        child_dna = copy.deepcopy(individ1.dna)
         mixed_index = []
         for j in range(self.fmmModel.nx):
             parent = None
-            if fitness_func1[j] >= fitness_func2[j]:
+            if individ1.fitness_func1[j] >= individ1.fitness_func2[j]:
                 parent = 1
             else:
                 parent = 2
@@ -1151,96 +1234,96 @@ class GA_helperI4 (GA_helper):
             mixed_index.append(parent)
             
             for i in range(self.fmmModel.nlayer):                        
-                for c in range(len(dna1[i][j])):
+                for c in range(len(individ1.dna[i][j])):
                     if parent == 1:
-                        child[i][j][c] = dna1[i][j][c]
+                        child_dna[i][j][c] = individ1.dna[i][j][c]
                     else:
-                        child[i][j][c] = dna2[i][j][c]
+                        child_dna[i][j][c] = individ2.dna[i][j][c]
 
-        return [child]    
+        return [self.createIndivid(child_dna)]    
 #        return self.checkChild (dna1,dna2,child)
 
-    def crossover4(self, dna1, dna2, gatherCache):
-        fitness_func1, fitness_gather1 = self.calcFitnessFunc (dna1, gatherCache)
-        fitness_func2, fitness_gather2 = self.calcFitnessFunc (dna2, gatherCache)
+    def crossover4(self, individ1, individ2):
+        individ1 = self.calcFitnessFunc (individ1)
+        individ2 = self.calcFitnessFunc (individ2)
 #        print ("fitness_func1", fitness_func1)
 #        print ("fitness_func2", fitness_func2)
         
-        child = copy.deepcopy(dna1)
+        child_dna = copy.deepcopy(individ1.dna)
 #        mixed_index = []
         for j in range(self.fmmModel.nx):
-            parent = weighted_choice_([fitness_func1[j], fitness_func2[j]])
+            parent = weighted_choice_([individ1.fitness_func[j], individ2.fitness_func[j]])
             for i in range(self.fmmModel.nlayer):                        
-                for c in range(len(dna1[i][j])):            
+                for c in range(len(individ1.dna[i][j])):            
                     if parent == 0:
-                        child[i][j][c] = dna1[i][j][c]
+                        child_dna[i][j][c] = individ1.dna[i][j][c]
                     if parent == 1:
-                        child[i][j][c] = dna2[i][j][c]
+                        child_dna[i][j][c] = individ2.dna[i][j][c]
 
-        return [child]   
+        return [self.createIndivid(child_dna)]   
 #        return self.checkChild (dna1,dna2,child)
         
     
-    def crossoverPolygam(self, population, power = 1, remove_average = 1):
+    def crossoverPolygam(self, population, power = 1, remove_average = 0):
         
-        fitness_func = [ self.calcFitnessFunc (dna)[0] for dna in population]
+        population = [ self.calcFitnessFunc (individ) for individ in population]
 #        print ("fitness_func", fitness_func[0])
                 
         pop_size = len(population)
         
         fitness_func_transposed = []
         for j in range(self.fmmModel.nx):
-            fitness_func_transposed.append([v[j] for v in fitness_func])
+            fitness_func_transposed.append([individ.fitness_func[j] for individ in population])
             
 #        print ("fitness_func", fitness_func_transposed[0])
         
         new_population = []
         while len (new_population) < pop_size:
-            child = copy.deepcopy(population[0])
+            child_dna = copy.deepcopy(population[0].dna)
             for j in range(self.fmmModel.nx):
                 parent = weighted_choice_(fitness_func_transposed[j], power, remove_average)                                            
                 for i in range(self.fmmModel.nlayer):  
-                    for c in range(len(child[i][j])):            
-                        child[i][j][c] = population[parent][i][j][c]
+                    for c in range(len(child_dna[i][j])):            
+                        child_dna[i][j][c] = population[parent][i][j][c]
 
-            new_population.append (child)
+            new_population.append (self.createIndivid(child_dna))
 
         return new_population
 
 
-    def crossover2(self, dna1, dna2):
-        child1 = copy.deepcopy(dna1)
-        child2 = copy.deepcopy(dna2)
+    def crossover2(self, individ1, individ2):
+        child_dna1 = copy.deepcopy(individ1.dna)
+        child_dna2 = copy.deepcopy(individ2.dna)
         for i in range(self.fmmModel.nlayer):
             for j in range(self.fmmModel.nx):
-                for c in range(len(dna1[i][j])):
+                for c in range(len(individ1.dna[i][j])):
                     w = random.random()
                     if w < 0.5:
-                        child1[i][j][c] = dna1[i][j][c]
-                        child2[i][j][c] = dna2[i][j][c]
+                        child_dna1[i][j][c] = individ1.dna[i][j][c]
+                        child_dna2[i][j][c] = individ2.dna[i][j][c]
                     else:
-                        child1[i][j][c] = dna2[i][j][c]
-                        child2[i][j][c] = dna1[i][j][c]
+                        child_dna1[i][j][c] = individ2.dna[i][j][c]
+                        child_dna2[i][j][c] = individ1.dna[i][j][c]
 
-        return [child1, child2]
+        return [self.createIndivid(child_dna1), self.createIndivid(child_dna2)]
         
-    def crossover1(self, dna1, dna2):
-        child1 = copy.deepcopy(dna1)
-        child2 = copy.deepcopy(dna2)
+    def crossover1(self, individ1, individ2):
+        child_dna1 = copy.deepcopy(individ1.dna)
+        child_dna2 = copy.deepcopy(individ2.dna)
         for i in range(self.fmmModel.nlayer):
             for j in range(self.fmmModel.nx):
                 w = random.random()
                 if w < 0.5:
-                    child1[i][j] = dna1[i][j]
-                    child2[i][j] = dna2[i][j]
+                    child_dna1[i][j] = individ1.dna[i][j]
+                    child_dna2[i][j] = individ2.dna[i][j]
                 else:
-                    child1[i][j] = dna2[i][j]
-                    child2[i][j] = dna1[i][j]
+                    child_dna1[i][j] = individ2.dna[i][j]
+                    child_dna2[i][j] = individ1.dna[i][j]
 
-        return [child1, child2]
+        return [self.createIndivid(child_dna1), self.createIndivid(child_dna2)]
         
-    def _crossover(self, dna1, dna2, gatherCache):
-        return self.crossover4(dna1, dna2, gatherCache)
+    def _crossover(self, individ1, individ2):
+        return self.crossover4(individ1, individ2)
                 
     def getGatherIndices (self, shot):
         return self._gatherModelIndex [shot]
@@ -1256,28 +1339,28 @@ class GA_helperI4 (GA_helper):
 #        print ("shot", shot, "submodel", submodel )
         return str(shot) + str(submodel)
 
-def GA_test (helper, dna, pop_size, mutation = 0.1):
-    correct = helper.fitness(dna)
-    correct = helper.applyConstraints(correct)
-    print ('Correct answer:', correct)
-    
-    for i in range(pop_size):
-        dna = helper.mutate(dna, mutation)
-        
-#        print(dna)
-        fit = helper.fitness(dna)
-#        print (dna, fit)
-#        print(i)
-        if fit > correct:
-            print ('We have a problem:', i, dna, fit)
-            exit()
+#def GA_test (helper, dna, pop_size, mutation = 0.1):
+#    correct = helper.fitness(dna)
+#    correct = helper.applyConstraints(correct)
+#    print ('Correct answer:', correct)
+#    
+#    for i in range(pop_size):
+#        dna = helper.mutate(dna, mutation)
+#        
+##        print(dna)
+#        fit = helper.fitness(dna)
+##        print (dna, fit)
+##        print(i)
+#        if fit > correct:
+#            print ('We have a problem:', i, dna, fit)
+#            exit()
         
  
 #def MonteCarlo (helper, correct_dna, pop_size, mutation = 0.1):
 #    correct = helper.fitness(correct_dna)
 #    print ('Correct answer:', correct)
 #    
-#    best_dna = helper.random_dna()
+#    best_dna = helper.random_individ()
 #    
 #    best_fit = helper.fitness(best_dna)
 #    
@@ -1286,7 +1369,7 @@ def GA_test (helper, dna, pop_size, mutation = 0.1):
 #        if mutation > 0:
 #            new_dna = helper.mutate(best_dna, mutation)
 #        else:
-#            new_dna = helper.random_dna()
+#            new_dna = helper.random_individ()
 #            
 #        new_fit = helper.fitness(new_dna)
 ##        print (dna, fit)
@@ -1299,34 +1382,37 @@ def GA_test (helper, dna, pop_size, mutation = 0.1):
 # Main driver
 # Generate a population and simulate GENERATIONS generations.
 #
-def create_childs (helper, mutation, weighted_population, gatherCache):
+def create_childs (helper, mutation, population):
     # Selection
-    ind1 = weighted_choice(weighted_population)
-    ind2 = weighted_choice(weighted_population)
+    individ1 = weighted_choice(population)
+    individ2 = weighted_choice(population)
 
     # Crossover
-    childs = helper.crossover(ind1, ind2, gatherCache)
+    childs = helper.crossover(individ1, individ2)
     
     for i in range(len(childs)):
         # Mutate and add back into the population.
         childs[i] = helper.mutate(childs[i], mutation)
+        
+#        childs[i] = helper.fitness(childs[i])
+#        print ("childs[i]", childs[i].dna, childs[i].fitness)
     return childs
 
-def create_new_population (helper, mutation, weighted_population):
+def create_new_population (helper, mutation, population):
                
-    pop_size = len (weighted_population)            
+    pop_size = len (population)            
     new_population = []
 
     # TEST child count
-    ind1 = weighted_choice(weighted_population)
-    ind2 = weighted_choice(weighted_population)
-    childs = helper.crossover(ind1, ind2, helper._gatherCache)
+    individ1 = weighted_choice(population)
+    individ2 = weighted_choice(population)
+    childs = helper.crossover(individ1, individ2)
     childs_count = len (childs)
     
     if g_sc != None:
         par_pop = g_sc.parallelize (range(pop_size/childs_count))
             
-        new_population_ = par_pop.map(lambda i: create_childs (helper.g_broadcastHelper.value, mutation, weighted_population, helper._gatherCache)).collect()
+        new_population_ = par_pop.map(lambda i: create_childs (helper.g_broadcastHelper.value, mutation, population)).collect()
         new_population = []
         for childs in new_population_:
             for child in childs:
@@ -1337,37 +1423,37 @@ def create_new_population (helper, mutation, weighted_population):
         # their genes over at a random point, mutate them, and add them back to the
         # population for the next iteration.
         while len (new_population) < pop_size:
-            childs = create_childs (helper, mutation, weighted_population, helper._gatherCache)
+            childs = create_childs (helper, mutation, population)
             for child in childs:
                 new_population.append(child)
     #            print ("after crosover")
+    
         return new_population
     
 
-def create_new_population_polygam (helper, mutation, weighted_population):
-    new_population = [v[0] for v in weighted_population]
-    new_population = helper.crossoverPolygam(new_population)
+def create_new_population_polygam (helper, mutation, population):
+    population = helper.crossoverPolygam(population)
     
-    for i in range(len(new_population)):
-        new_population[i] = helper.mutate(new_population[i], mutation)
+    for i in range(len(population)):
+        population[i] = helper.mutate(population[i], mutation)
         
-    return new_population;
+    return population;
 
 
 def GA_run_on_population (helper, images_path, population, 
         generatoin_count = 30, mutation = 0.1):  
     
-    weighted_population = helper.weight (population)
+    population = helper.weight (population)
 
     best_generation = 0
-    (global_best_ind, global_best_fitness) = helper.getBest(weighted_population)
+    global_best_individ = helper.getBest(population)
     
     print ('Init')
-#    helper.print_weight (weighted_population)
-    print ("global best individual", global_best_ind, global_best_fitness)
+#    helper.print_weight (population)
+    print ("global best individual", global_best_individ.fitness)
     
     # print start point
-    helper.draw (global_best_ind, images_path + "start")
+    helper.draw (global_best_individ, images_path + "start")
 
     convergence_best_func = []
     convergence_best_func.append (0)
@@ -1380,30 +1466,32 @@ def GA_run_on_population (helper, images_path, population,
     # Simulate all of the generations.
     for generation in range(generatoin_count):
     
-        population = create_new_population (helper, mutation, weighted_population)
-            
-        weighted_population = helper.weight (population)    
-        (local_best_ind, local_maximum_fitness) = helper.getBest(weighted_population)
+        population = create_new_population (helper, mutation, population)
+        population = helper.weight (population)    
         
-        if local_maximum_fitness > global_best_fitness:
-            global_best_ind = local_best_ind
-            global_best_fitness = local_maximum_fitness
+#        print ("population", [individ.fitness for individ in population])
+
+        
+        local_best_individ = helper.getBest(population)
+        
+        if local_best_individ.fitness > global_best_individ.fitness:
+            global_best_individ = local_best_individ
             best_generation = generation
             print ("new global best!")
-            helper.draw (local_best_ind, images_path + 'iter_' + str(generation))
+            helper.draw (global_best_individ, images_path + 'iter_' + str(generation))
 #            print ("after draw")
 
     
         print ('Generation', generation)
-#        helper.print_weight (weighted_population)
+#        helper.print_weight (population)
 
-        print ("global best individual", best_generation, global_best_fitness)
-        print ("local best individual", local_maximum_fitness)
+        print ("global best individual", best_generation, global_best_individ.fitness)
+        print ("local best individual", local_best_individ.fitness)
             
-        weight_aver = sum((item[1] for item in weighted_population))/len(weighted_population)
+        weight_aver = sum((item.fitness for item in population))/len(population)
         print ("Total weight", weight_aver)
 
-        convergence_best_func.append (local_maximum_fitness)
+        convergence_best_func.append (local_best_individ.fitness)
         convergence_aver_func.append (weight_aver)
         if generation % 10 == 0:
             import model_FD
@@ -1415,7 +1503,7 @@ def GA_run_on_population (helper, images_path, population,
 #        helper.fitness(local_best_ind,  image_path=images_path+'gen_'+str(generation))
 
 def GA_run (helper, images_path, correct_dna,
-        pop_size = 20, generatoin_count = 30, mutation = 0.1):  
+        pop_size = 20, generatoin_count = 30, mutation = 0.01):  
     helper.print_info()
     
     if g_sc != None:
@@ -1425,8 +1513,8 @@ def GA_run (helper, images_path, correct_dna,
     if not os.path.exists(images_path):
         os.makedirs(images_path)
         
-    correct = helper.fitness(correct_dna)
-    print ('Correct answer:', correct)
+    correct_dna = helper.fitness(helper.createIndivid(correct_dna))
+    print ('Correct answer:', correct_dna.fitness)
     
     helper.draw (correct_dna, images_path + "correct")
     
