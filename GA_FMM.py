@@ -398,7 +398,7 @@ class GA_helper ():
         pop = []
         for i in range(pop_size):       
             individ = self.random_individ()
-            individ = self.fitness(individ)
+#            individ = self.fitness(individ)
             pop.append(individ)
         return pop
         
