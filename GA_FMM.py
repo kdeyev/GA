@@ -575,7 +575,7 @@ class GA_helper ():
             
         if g_sc != None:
             par_pop = g_sc.parallelize (population)       
-            population = par_pop.map(lambda individ: [self.g_broadcastHelper.value.fitness(individ)]).collect()
+            population = par_pop.map(lambda individ: self.g_broadcastHelper.value.fitness(individ)).collect()
         else:   
             population = [self.fitness(individ) for individ in population]
                               
