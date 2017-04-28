@@ -419,10 +419,10 @@ def prepare_helper (modelGeom, gathers, correct_dna, images_path):
                 print ("wrong constriant")
                 exit (0)
                 
-    helper = GA.GA_helperI4 (modelGeom, gathers, 0.00, True, len(correct_dna), len(correct_dna[0]), vel_constr, thick_constr)
+    helper = GA.GA_helperI4 (modelGeom, gathers, 0.01, True, len(correct_dna), len(correct_dna[0]), vel_constr, thick_constr)
     helper.define_FMM_energy_semb()
     
-    helper.putSpikeToGathers (correct_dna);
+#    helper.putSpikeToGathers (correct_dna);
       
 #    helper.addConstraint(GA.GA_helperI4_Constraint_Well (correct_dna))
     helper.addConstraint(GA.GA_helperI4_Constraint_V (correct_dna))
@@ -458,8 +458,8 @@ def test_correct_dna (modelGeom, orig_gathers, correct_dna,
         
 if __name__ == "__main__":
 #    model_path = '//home/cloudera/TRM/acoustic_FD_TRM/tests/evgeny/'
-#    model_path = 'C:/GA/tests/evgeny/'
-    model_path = "C:/Users/kostyad/Google Drive/Phd/Near surface/EAT/TRM/acoustic_FD_TRM/tests/evgeny/"
+    model_path = 'C:/GA/tests/evgeny/'
+#    model_path = "C:/Users/kostyad/Google Drive/Phd/Near surface/EAT/TRM/acoustic_FD_TRM/tests/evgeny/"
     if not os.path.exists(model_path):
         os.makedirs(model_path)
     
@@ -523,4 +523,4 @@ if __name__ == "__main__":
 #    exit()
         
     GA.GA_run (helper, images_path, correct_dna,
-        pop_size = 1000, generatoin_count = 1000, mutation = 0.1)    
+        pop_size = 1000, generatoin_count = 1000, mutation = 0.03)    
