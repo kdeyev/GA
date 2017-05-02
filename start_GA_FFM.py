@@ -9,6 +9,7 @@ import os
 import GA_FMM as GA
 import copy
 import subprocess
+import numpy
 
 def modelingMultiGatherModel(model_path, vel):
     import model_FD
@@ -174,8 +175,6 @@ def modelingOneModel(model_path, vel):
     c.createImages ()
 
 def run_SU (args, g):
-    import subprocess
-    import numpy
     import segypy
     
     p = subprocess.Popen(
@@ -400,12 +399,12 @@ def prepare_gather(c, images_path):
         
 def prepare_helper (modelGeom, gathers, correct_dna, images_path):
     
-    vel_constr = [[1500, 2500],
-                  [2500, 3500],
-                  [4500, 5500]]
-    thick_constr = [[0, 100],
-                   [50, 150],
-                   [0, 200]]
+    vel_constr = [[1500, 2500, 10],
+                  [2500, 3500, 10],
+                  [4500, 5500, 10]]
+    thick_constr = [[0, 100, 5],
+                   [50, 150, 5],
+                   [0, 200,  5]]
                    
                
     for i in range(len(correct_dna)):
@@ -422,6 +421,18 @@ def prepare_helper (modelGeom, gathers, correct_dna, images_path):
     helper = GA.GA_helperI4 (modelGeom, gathers, 0.01, True, len(correct_dna), len(correct_dna[0]), vel_constr, thick_constr)
     helper.define_FMM_energy_semb()
     
+#    GA.writeArray (images_path + 'correct_dna', correct_dna)
+#    correct_dna = GA.readArray (images_path + 'correct_dna')
+    
+    print ('number of combinations:', helper.caclCombinationNum ())
+        
+    super_correct_dna_file = images_path + 'super_correct_dna'
+    if os.path.isfile(super_correct_dna_file):
+        super_correct_dna = GA.readArray (super_correct_dna_file)
+    else:
+        super_correct_dna = helper.maximize (correct_dna)      
+        GA.writeArray (super_correct_dna_file, super_correct_dna)
+    
 #    helper.putSpikeToGathers (correct_dna);
       
 #    helper.addConstraint(GA.GA_helperI4_Constraint_Well (correct_dna))
@@ -430,9 +441,20 @@ def prepare_helper (modelGeom, gathers, correct_dna, images_path):
         
     individ = helper.fitness(helper.createIndivid(correct_dna))
     print ('Correct answer:', individ.fitness)
- 
+    
     if images_path != None:
         helper.draw (individ, images_path + "correct")
+    
+    individ = helper.fitness(helper.createIndivid(super_correct_dna))
+    print ('super_correct_dna', super_correct_dna)    
+    print ('Super correct answer:', individ.fitness)
+ 
+    if images_path != None:
+        helper.draw (individ, images_path + "super_correct")
+        
+    helper.draw_gathers = False
+    
+#    exit (0)
     return helper
             
 def test_correct_dna (modelGeom, orig_gathers, correct_dna,

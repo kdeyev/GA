@@ -34,6 +34,18 @@ def getSparkContext ():
     
 g_sc = getSparkContext ()
 
+def writeArray (filename, dna):
+    with open(filename, 'wb') as f:
+#            dna = numpy.reshape (dna, (self.fmmModel.nlayer*self.fmmModel.nx*2))
+        numpy.save (f, dna)
+        
+def readArray (filename):
+    with open(filename, 'rb') as f:
+        dna = numpy.load (f)
+#            dna = numpy.reshape (dna, (self.fmmModel.nlayer, self.fmmModel.nx, 2))
+        return dna
+            
+            
 def nmo_FMM (g, tt, win, fast):
     win_samp = int(win/g.dt/2)
 
@@ -416,7 +428,6 @@ class GA_helper ():
 #            if image_path != None and self.draw_gathers:
 #                gather_image_path = image_path + 'gather_' + str(shot)
             self.gathers[shot] = put_spike_FMM (g, tt) 
-         
             
     def fitness(self, individ, image_path=None):
         if individ.fitness != None:
@@ -1078,10 +1089,10 @@ class GA_helperI4 (GA_helper):
         
         
     def random_th(self, th1, layer):
-        return round_z(bound_random_new (self._thickConstr[layer][0], self._thickConstr[layer][1]))    
+        return round_z(bound_random_new (self._thickConstr[layer][0], self._thickConstr[layer][1]), self._thickConstr[layer][2])    
         
     def random_v_constr(self, v, layer):
-        return round_v(bound_random_new (self._velConstr[layer][0], self._velConstr[layer][1]))  
+        return round_v(bound_random_new (self._velConstr[layer][0], self._velConstr[layer][1]), self._velConstr[layer][2])  
         
     def _random_individ(self):
         dna = []
@@ -1109,6 +1120,14 @@ class GA_helperI4 (GA_helper):
         dna_m = fmm_model.generateFDModel(self.modelGeom)
 #        print ('dna_m.v',dna_m.v)
         return dna_m
+        
+    def caclCombinationNum (self, ):
+        num = 1
+        for i in range(self.fmmModel.nlayer):
+            for j in range(self.fmmModel.nx):
+                num = num * (self._thickConstr[i][1] - self._thickConstr[i][0])/self._thickConstr[i][2]
+                num = num * (self._velConstr[i][1] - self._velConstr[i][0])/self._velConstr[i][2]
+        return num
             
     def _mutate(self, individ, mutation_chance):      
         lz = int(self.modelGeom.lz())
@@ -1170,6 +1189,24 @@ class GA_helperI4 (GA_helper):
         model_FD.draw_convergence (fitness_func, "Position", "Fitness", "Fitness function of parent", images_path + 'func_fit.png')
         
         exit (0)
+
+    def maxFitness (self, dna):
+        dna = numpy.reshape (dna, (self.fmmModel.nlayer, self.fmmModel.nx, 2))
+        return 1./self.fitness(self.createIndivid(dna)).fitness
+        
+    def maximize (self, dna, options={'xatol': 0.1, 
+                                      'fatol' : 0.01,
+                                      'disp': False,
+#                                      'maxiter' : 5 
+                                      }):
+        dna = numpy.reshape (dna, (self.fmmModel.nlayer*self.fmmModel.nx*2))
+        
+        from scipy.optimize import minimize
+        ret_val = minimize(self.maxFitness, dna, method='nelder-mead', options=options)
+        print (ret_val)
+        dna = ret_val.get('x')
+        dna = numpy.reshape (dna, (self.fmmModel.nlayer, self.fmmModel.nx, 2))
+        return dna
  
         
 #    def checkChild (self, individ1, individ2, child):
@@ -1439,9 +1476,12 @@ def create_new_population_polygam (helper, mutation, population):
         
     return population;
 
+def smooth (f, N) :
+    return numpy.convolve (f, numpy.ones ((N,))/N, mode='valid')
+    
 
 def GA_run_on_population (helper, images_path, population, 
-        generatoin_count = 30, mutation = 0.1):  
+        generatoin_count = 30, mutation = 0.1, fitness_smooth_len = 20):  
     
     population = helper.weight (population)
 
@@ -1462,6 +1502,8 @@ def GA_run_on_population (helper, images_path, population,
     convergence_aver_func = []
     convergence_aver_func.append (0)
     
+    convergence_aver_func_smooth = []
+    convergence_aver_func_smooth.append (0)
     
     # Simulate all of the generations.
     for generation in range(generatoin_count):
@@ -1480,6 +1522,7 @@ def GA_run_on_population (helper, images_path, population,
             print ("new global best!")
             helper.draw (global_best_individ, images_path + 'iter_' + str(generation))
 #            print ("after draw")
+            writeArray (images_path + 'global_best', global_best_individ.dna)
 
     
         print ('Generation', generation)
@@ -1493,12 +1536,39 @@ def GA_run_on_population (helper, images_path, population,
 
         convergence_best_func.append (local_best_individ.fitness)
         convergence_aver_func.append (weight_aver)
+        convergence_aver_func_smooth = smooth (convergence_aver_func, fitness_smooth_len)
+        convergence_best_func_smooth = smooth (convergence_best_func, fitness_smooth_len)            
+        
         if generation % 10 == 0:
             import model_FD
             model_FD.draw_convergence ([convergence_best_func], "Generation", "Fitness", "Best fitness", images_path + 'convergence_best.png')
             model_FD.draw_convergence ([convergence_aver_func], "Generation", "Fitness", "Aver fitness", images_path + 'convergence_aver.png')
+            model_FD.draw_convergence ([convergence_aver_func_smooth], "Generation", "Fitness", "Aver fitness", images_path + 'convergence_aver_smooth.png')
+            model_FD.draw_convergence ([convergence_best_func_smooth], "Generation", "Fitness", "Best fitness", images_path + 'convergence_best_smooth.png')
+
+            
  
+#        writeArray(images_path + 'poputalion', population)
         
+        ll = len  (convergence_best_func_smooth)
+        
+        if ll > 2:
+            print (convergence_best_func_smooth[ll-1], convergence_best_func_smooth[ll-2])
+            
+            improuvement = (convergence_best_func_smooth[ll-1] - convergence_best_func_smooth[ll-2])/convergence_best_func_smooth[ll-1]
+            print ("improuvement", improuvement)
+            
+        if ll > fitness_smooth_len:
+            if improuvement > 0 and improuvement < 0.001:                
+                final_dna = helper.maximize (global_best_individ.dna)      
+                writeArray (images_path + "final", final_dna)
+                
+                final_individ = helper.fitness(helper.createIndivid (final_dna))
+                helper.draw (final_individ, images_path + "final")
+                print ("final best individual", final_individ.fitness)
+                
+                return population
+#        
     return population
 #        helper.fitness(local_best_ind,  image_path=images_path+'gen_'+str(generation))
 
@@ -1521,5 +1591,10 @@ def GA_run (helper, images_path, correct_dna,
     # Generate initial population. This will create a list of POP_SIZE strings,
     # each initialized to a sequence of random characters.
     population = helper.random_population(pop_size)
+    
+    population_file = images_path + 'poputalion'
+    if os.path.isfile(population_file):
+        population = readArray (population_file)
+    
     population = GA_run_on_population(helper, images_path, population, generatoin_count, mutation)
     return population
