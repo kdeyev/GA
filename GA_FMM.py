@@ -117,19 +117,18 @@ def calc_fit_FMM (g, tt, win, fast, image_path=None):
     aver_semb = numpy.average(semb)
     return aver_semb, energy
 
-def put_spike_FMM (g, tt):
+def put_spike_FMM (g, tt, win=2):
     
     import model_FD
     g_spike = model_FD.gather(g.nt, g.dt, g.dh, g.sPos(), g.rPos())
 
     for i in range (g.ntr):
         in_samp = int (tt[i]/g.dt)
-        if in_samp < 0 or in_samp >= (g.nt -1):
+        if in_samp < 0 or in_samp >= (g.nt):
             continue
 	           
-#        print (i, in_samp)
-        g_spike.v[in_samp][i] = 1
-        g_spike.v[in_samp+1][i] = 1
+        for k in range (max(in_samp-win,0),min(in_samp+win+1,g.nt-1)):
+            g_spike.v[k][i] = 1
 
     g_spike.norm_ampl = 1
 	
@@ -348,7 +347,7 @@ class GA_helper ():
         self.gathers = gathers
         self.win = win
         self.fast = fast
-        self.draw_gathers = False
+        self.draw_gathers = True
         self._constraints = []
         self._cache = {}
         self._gatherCache = {}

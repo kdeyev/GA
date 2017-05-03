@@ -433,7 +433,7 @@ def prepare_helper (modelGeom, gathers, correct_dna, images_path):
         super_correct_dna = helper.maximize (correct_dna)      
         GA.writeArray (super_correct_dna_file, super_correct_dna)
     
-#    helper.putSpikeToGathers (correct_dna);
+    helper.putSpikeToGathers (correct_dna);
       
 #    helper.addConstraint(GA.GA_helperI4_Constraint_Well (correct_dna))
     helper.addConstraint(GA.GA_helperI4_Constraint_V (correct_dna))
