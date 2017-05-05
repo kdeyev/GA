@@ -423,18 +423,19 @@ def prepare_helper (modelGeom, gathers, correct_dna, images_path):
     
 #    GA.writeArray (images_path + 'correct_dna', correct_dna)
 #    correct_dna = GA.readArray (images_path + 'correct_dna')
-    
+       
+    helper.putSpikeToGathers (correct_dna);
+
     print ('number of combinations:', helper.caclCombinationNum ())
         
-    super_correct_dna_file = images_path + 'super_correct_dna'
-    if os.path.isfile(super_correct_dna_file):
-        super_correct_dna = GA.readArray (super_correct_dna_file)
-    else:
-        super_correct_dna = helper.maximize (correct_dna)      
-        GA.writeArray (super_correct_dna_file, super_correct_dna)
+#    super_correct_dna_file = images_path + 'super_correct_dna'
+#    if os.path.isfile(super_correct_dna_file):
+#        super_correct_dna = GA.readArray (super_correct_dna_file)
+#    else:
+#        super_correct_dna = helper.maximize (correct_dna)      
+#        GA.writeArray (super_correct_dna_file, super_correct_dna)
+ 
     
-    helper.putSpikeToGathers (correct_dna);
-      
 #    helper.addConstraint(GA.GA_helperI4_Constraint_Well (correct_dna))
     helper.addConstraint(GA.GA_helperI4_Constraint_V (correct_dna))
 #    helper.addConstraint(GA.GA_helperI4_Constraint_Point(correct_dna, True, True))
@@ -445,14 +446,14 @@ def prepare_helper (modelGeom, gathers, correct_dna, images_path):
     if images_path != None:
         helper.draw (individ, images_path + "correct")
     
-    individ = helper.fitness(helper.createIndivid(super_correct_dna))
-    print ('super_correct_dna', super_correct_dna)    
-    print ('Super correct answer:', individ.fitness)
- 
-    if images_path != None:
-        helper.draw (individ, images_path + "super_correct")
+#    individ = helper.fitness(helper.createIndivid(super_correct_dna))
+#    print ('super_correct_dna', super_correct_dna)    
+#    print ('Super correct answer:', individ.fitness)
+# 
+#    if images_path != None:
+#        helper.draw (individ, images_path + "super_correct")
         
-    helper.draw_gathers = False
+#    helper.draw_gathers = False
     
 #    exit (0)
     return helper

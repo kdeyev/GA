@@ -117,7 +117,7 @@ def calc_fit_FMM (g, tt, win, fast, image_path=None):
     aver_semb = numpy.average(semb)
     return aver_semb, energy
 
-def put_spike_FMM (g, tt, win=2):
+def put_spike_FMM (g, tt, win=20):
     
     import model_FD
     g_spike = model_FD.gather(g.nt, g.dt, g.dh, g.sPos(), g.rPos())
@@ -128,7 +128,7 @@ def put_spike_FMM (g, tt, win=2):
             continue
 	           
         for k in range (max(in_samp-win,0),min(in_samp+win+1,g.nt-1)):
-            g_spike.v[k][i] = 1
+            g_spike.v[k][i] = 1.-abs(float(k-in_samp))/float(win)
 
     g_spike.norm_ampl = 1
 	
@@ -347,7 +347,7 @@ class GA_helper ():
         self.gathers = gathers
         self.win = win
         self.fast = fast
-        self.draw_gathers = True
+        self.draw_gathers = False
         self._constraints = []
         self._cache = {}
         self._gatherCache = {}
@@ -1475,8 +1475,16 @@ def create_new_population_polygam (helper, mutation, population):
         
     return population;
 
-def smooth (f, N) :
-    return numpy.convolve (f, numpy.ones ((N,))/N, mode='valid')
+#def smooth (f, N) :
+#    return numpy.convolve (f, numpy.ones ((N,))/N, mode='valid')
+
+def get_improvement (func, fitness_smooth_len):
+    y = func[-fitness_smooth_len:]
+    x = [i for i in range(len(y))]
+    
+    from scipy import stats
+    slope, intercept, r_value, p_value, std_err = stats.linregress(x,y)
+    return slope/intercept
     
 
 def GA_run_on_population (helper, images_path, population, 
@@ -1495,14 +1503,14 @@ def GA_run_on_population (helper, images_path, population,
     helper.draw (global_best_individ, images_path + "start")
 
     convergence_best_func = []
-    convergence_best_func.append (0)
+#    convergence_best_func.append (0)
 #    convergence_best_func.append (global_best_fitness)
 
     convergence_aver_func = []
-    convergence_aver_func.append (0)
+#    convergence_aver_func.append (0)
     
-    convergence_aver_func_smooth = []
-    convergence_aver_func_smooth.append (0)
+#    convergence_aver_func_smooth = []
+#    convergence_aver_func_smooth.append (0)
     
     # Simulate all of the generations.
     for generation in range(generatoin_count):
@@ -1535,38 +1543,28 @@ def GA_run_on_population (helper, images_path, population,
 
         convergence_best_func.append (local_best_individ.fitness)
         convergence_aver_func.append (weight_aver)
-        convergence_aver_func_smooth = smooth (convergence_aver_func, fitness_smooth_len)
-        convergence_best_func_smooth = smooth (convergence_best_func, fitness_smooth_len)            
+#        convergence_aver_func_smooth = smooth (convergence_aver_func, fitness_smooth_len)
+#        convergence_best_func_smooth = smooth (convergence_best_func, fitness_smooth_len)            
+        
         
         if generation % 10 == 0:
             import model_FD
             model_FD.draw_convergence ([convergence_best_func], "Generation", "Fitness", "Best fitness", images_path + 'convergence_best.png')
             model_FD.draw_convergence ([convergence_aver_func], "Generation", "Fitness", "Aver fitness", images_path + 'convergence_aver.png')
-            model_FD.draw_convergence ([convergence_aver_func_smooth], "Generation", "Fitness", "Aver fitness", images_path + 'convergence_aver_smooth.png')
-            model_FD.draw_convergence ([convergence_best_func_smooth], "Generation", "Fitness", "Best fitness", images_path + 'convergence_best_smooth.png')
+#            model_FD.draw_convergence ([convergence_aver_func_smooth], "Generation", "Fitness", "Aver fitness", images_path + 'convergence_aver_smooth.png')
+#            model_FD.draw_convergence ([convergence_best_func_smooth], "Generation", "Fitness", "Best fitness", images_path + 'convergence_best_smooth.png')
 
-            
+        improuvement = get_improvement (convergence_aver_func, fitness_smooth_len)
+        print ("improuvement", improuvement)
  
-#        writeArray(images_path + 'poputalion', population)
-        
-        ll = len  (convergence_best_func_smooth)
-        
-        if ll > 2:
-            print (convergence_best_func_smooth[ll-1], convergence_best_func_smooth[ll-2])
-            
-            improuvement = (convergence_best_func_smooth[ll-1] - convergence_best_func_smooth[ll-2])/convergence_best_func_smooth[ll-1]
-            print ("improuvement", improuvement)
-            
-        if ll > fitness_smooth_len:
-            if improuvement > 0 and improuvement < 0.001:                
-                final_dna = helper.maximize (global_best_individ.dna)      
-                writeArray (images_path + "final", final_dna)
-                
-                final_individ = helper.fitness(helper.createIndivid (final_dna))
-                helper.draw (final_individ, images_path + "final")
-                print ("final best individual", final_individ.fitness)
-                
-                return population
+        if improuvement < 0.01:                
+            final_dna = helper.maximize (global_best_individ.dna)      
+            writeArray (images_path + "final", final_dna)           
+            final_individ = helper.fitness(helper.createIndivid (final_dna))
+            helper.draw_gathers = True
+            helper.draw (final_individ, images_path + "final")
+            print ("final best individual", final_individ.fitness)        
+            return population
 #        
     return population
 #        helper.fitness(local_best_ind,  image_path=images_path+'gen_'+str(generation))
