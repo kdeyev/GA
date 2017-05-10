@@ -351,6 +351,7 @@ class GA_helper ():
         self._constraints = []
         self._cache = {}
         self._gatherCache = {}
+        self._use_cache = False
         
         
     def addConstraint(self, constraint):
@@ -453,7 +454,7 @@ class GA_helper ():
             if individ.key == None:
                 throw (42)
 
-            if individ.addToCache==True:
+            if individ.addToCache==True and self._use_cache:
                 self._cache [individ.key] = individ
                 individ.addToCache=False
             else:
@@ -465,7 +466,7 @@ class GA_helper ():
                 if gather_individ.key == None:
                     throw (42)
                 
-                if gather_individ.addToCache==True:
+                if gather_individ.addToCache==True and self._use_cache:
                     self._gatherCache [gather_individ.key] = gather_individ
                     gather_individ.addToCache=False
                     individ.gather_individs[j] = gather_individ
@@ -1193,8 +1194,10 @@ class GA_helperI4 (GA_helper):
         dna = numpy.reshape (dna, (self.fmmModel.nlayer, self.fmmModel.nx, 2))
         return 1./self.fitness(self.createIndivid(dna)).fitness
         
-    def maximize (self, dna, options={'xatol': 0.1, 
-                                      'fatol' : 0.01,
+    def maximize (self, dna, options={'xatol': 0.0001, 
+                                      'fatol' : 0.00001,
+                                      'maxiter' : 10000,
+                                      'maxfev' : 10000,
                                       'disp': False,
 #                                      'maxiter' : 5 
                                       }):
@@ -1488,7 +1491,7 @@ def get_improvement (func, fitness_smooth_len):
     
 
 def GA_run_on_population (helper, images_path, population, 
-        generatoin_count = 30, mutation = 0.1, fitness_smooth_len = 20):  
+        generatoin_count = 30, mutation = 0.1, fitness_smooth_len = 1000):  
     
     population = helper.weight (population)
 
@@ -1554,10 +1557,10 @@ def GA_run_on_population (helper, images_path, population,
 #            model_FD.draw_convergence ([convergence_aver_func_smooth], "Generation", "Fitness", "Aver fitness", images_path + 'convergence_aver_smooth.png')
 #            model_FD.draw_convergence ([convergence_best_func_smooth], "Generation", "Fitness", "Best fitness", images_path + 'convergence_best_smooth.png')
 
-        improuvement = get_improvement (convergence_aver_func, fitness_smooth_len)
+        improuvement = get_improvement (convergence_best_func, fitness_smooth_len)
         print ("improuvement", improuvement)
  
-        if improuvement < 0.01:                
+        if generation > fitness_smooth_len and improuvement < 0.00001 or generation == generatoin_count-1:                
             final_dna = helper.maximize (global_best_individ.dna)      
             writeArray (images_path + "final", final_dna)           
             final_individ = helper.fitness(helper.createIndivid (final_dna))
