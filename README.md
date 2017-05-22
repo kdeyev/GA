@@ -1,1 +1,1 @@
-# GA
+(C:\Users\kostyad\AppData\Local\Continuum\Anaconda2) C:\GA>C:\spark-1.6.3-bin-hadoop2.6\bin\pyspark start_GA_FFM.py

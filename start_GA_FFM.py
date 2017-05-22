@@ -5,13 +5,14 @@ Created on Sat Jan 14 00:06:47 2017
 
 @author: cloudera
 """
+import sys
 import os
 import GA_FMM as GA
 import copy
 import subprocess
 import numpy
 
-def modelingMultiGatherModel(model_path, vel):
+def modelingMultiGatherModel(model_path, vel, calc):
     import model_FD
     
     c = model_FD.config(model_path)
@@ -21,7 +22,7 @@ def modelingMultiGatherModel(model_path, vel):
     c.nu0 = 20 #Hz
 #    c.snap = 20
     c.snap = -1
-    c.g_ns = 11
+    c.g_ns = 101
     
         
     # enable PML
@@ -50,15 +51,16 @@ def modelingMultiGatherModel(model_path, vel):
         param_name = c.path + 'param_fw.txt'
         c.writeToFile(param_name)
         
-        # command line args
-        args = ['/home/cloudera/TRM/acoustic_FD_TRM/bin',
-                param_name]
-        
-        log_name = c.path + 'log.txt'
-        with open(log_name, 'w') as f:
-            subprocess.call(args, stdout=f)
-
-        g = c.readGather (shot)
+        if calc:
+            # command line args
+            args = ['/home/cloudera/TRM/acoustic_FD_TRM/bin',
+                    param_name]
+            
+            log_name = c.path + 'log.txt'
+            with open(log_name, 'w') as f:
+                subprocess.call(args, stdout=f)
+    
+        g = c.readGather (shot, calc)
         
         gathers.append(g)
     
@@ -205,18 +207,18 @@ def run_SU (args, g):
     
     return g
     
-def testEntropy (helper, figure_name):
-        
-    correct_dna = [125., 2000., 3500.]
-    fitness, info = helper.draw (correct_dna, images_path + 'correct')
-    print ('correct', info)
-
-    
-    wrong_dna = [130., 2680., 3340.]   
-    fitness, info = helper.draw (wrong_dna, images_path + 'wrong')
-    print ('wrong', info)
-    
-    exit ()
+#def testEntropy (helper, figure_name):
+#        
+#    correct_dna = [125., 2000., 3500.]
+#    fitness, info = helper.draw (correct_dna, images_path + 'correct')
+#    print ('correct', info)
+#
+#    
+#    wrong_dna = [130., 2680., 3340.]   
+#    fitness, info = helper.draw (wrong_dna, images_path + 'wrong')
+#    print ('wrong', info)
+#    
+#    exit ()
  
 #    
 #def testObjective (helper, correct_dna, figure_name=None):
@@ -340,12 +342,12 @@ def write_gathers (c, gathers):
         g.writeToFile (new_nather_name)    
         c._gather_file = new_nather_name  
         
-def read_gathers (c):
+def read_gathers (c, read):
     gathers = []
     c.g_gather_file = c.g_gather_file + '_proc'
         
     for shot in range(c.g_ns):
-        g = c.readGather (shot)
+        g = c.readGather (shot, read)
         gathers.append(g)
         
     return gathers
@@ -424,7 +426,7 @@ def prepare_helper (modelGeom, gathers, correct_dna, images_path):
     helper.putSpikeToGathers (correct_dna);
    
 #    helper.addConstraint(GA.GA_helperI4_Constraint_Well (correct_dna))
-    helper.addConstraint(GA.GA_helperI4_Constraint_V (correct_dna))
+#    helper.addConstraint(GA.GA_helperI4_Constraint_V (correct_dna))
 #    helper.addConstraint(GA.GA_helperI4_Constraint_Point(correct_dna, True, True))
 
     print ('number of combinations:', helper.caclCombinationNum ())
@@ -438,23 +440,23 @@ def prepare_helper (modelGeom, gathers, correct_dna, images_path):
     if images_path != None:
         helper.draw (individ, images_path + "correct")
 
-        
-#    correct_dna = GA.readArray (images_path + 'correct_dna')
-#    super_correct_dna_file = images_path + 'super_correct_dna'
-#    if os.path.isfile(super_correct_dna_file):
-#        super_correct_dna = GA.readArray (super_correct_dna_file)
+#    global_dna = GA.readArray (images_path + 'global_best')
+#    super_global_dna_file = images_path + 'super_global_dna'
+#    if os.path.isfile(super_global_dna_file):
+#        super_global_dna = GA.readArray (super_global_dna_file)
 #    else:
-#        super_correct_dna = helper.maximize (correct_dna)      
-#        GA.writeArray (super_correct_dna_file, super_correct_dna)
+#        super_global_dna = helper.maximize (global_dna)      
+#        GA.writeArray (super_global_dna_file, super_global_dna)
 #     
-#    individ = helper.fitness(helper.createIndivid(super_correct_dna))
-#    print ('super_correct_dna', super_correct_dna)    
-#    print ('Super correct answer:', individ.fitness)
+#    individ = helper.fitness(helper.createIndivid(super_global_dna))
+#    print ('super_global_dna', super_global_dna)    
+#    print ('Super global answer:', individ.fitness)
 # 
 #    if images_path != None:
-#        helper.draw (individ, images_path + "super_correct")
+#        helper.draw (individ, images_path + "super_global")
 #    
 #    exit (0)
+
     return helper
             
 def test_correct_dna (modelGeom, orig_gathers, correct_dna,
@@ -495,10 +497,14 @@ if __name__ == "__main__":
     images_path = c.path + 'GA_images_evgeny_FMM/' 
     if not os.path.exists(images_path):
         os.makedirs(images_path)
+    
+    # redirect stdout into file 
+    f = open(images_path + 'log.txt', 'w')
+    sys.stdout = f
      
 #    gathers = prepare_gather_agc(c, None)
 #    write_gathers (c, gathers)
-    gathers = read_gathers (c)
+    gathers = read_gathers (c, False)
 
     #    exit (0)
 #    gathers = prepare_gather_mute_direct_offset(c, images_path)
@@ -529,7 +535,7 @@ if __name__ == "__main__":
     helper = prepare_helper (modelGeom, gathers, correct_dna, images_path)  
 
                    
-#    modelingMultiGatherModel(model_path, helper.getModel_FD(correct_dna))
+#    modelingMultiGatherModel(model_path, helper.getModel_FD(correct_dna), False)
 #    exit ()
 
 #    testEntropy (helper, images_path)

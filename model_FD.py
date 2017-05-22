@@ -631,7 +631,7 @@ class config ():
                         # is propagated in reverse-time. In that case the zero-offset image
                         # is stored in the file defined by "wfl=" at the last position (zero-time).
                         
-        self.dr = 10
+        self.dr = 50
         self.offset = 2500
         
         self.g_ns = 1
@@ -856,12 +856,14 @@ class config ():
             x = i * self.dh
             f.write ('%s %s\n' % (x, 0))
 
-    def readGather (self, shot):
+    def readGather (self, shot, read = True):
         self.setCurrentShot(shot)
         
             
         g = gather(self.nt, self.dt, self.dr, self._getSourcePosition(), self._getRecPosition())
-        g.readValues (self._gather_file)
+        if read:
+            g.readValues (self._gather_file)
+            
         return g
         
     def drawEnargyAtSource (self, figure_name):

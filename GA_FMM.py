@@ -1363,7 +1363,29 @@ class GA_helperI4 (GA_helper):
         
     def _crossover(self, individ1, individ2):
         return self.crossover4(individ1, individ2)
+
+    def drawError (self, individ1, individ2, images_path):
+        dna_m1 = self.getModel_FD(individ1.dna)   
+        dna_m2 = self.getModel_FD(individ2.dna)   
+        abs_error_m = copy.deepcopy (dna_m1)
+        rel_error_m = copy.deepcopy (dna_m1)
+        
+        
+        rel_error = 0
+        abs_error = 0
+        for i in range(dna_m1.nx):
+            for j in range (dna_m1.nz):                
+                abs_error_m.v[i][j] = dna_m2.v[i][j] - dna_m1.v[i][j]
+                rel_error_m.v[i][j] = (abs_error_m.v[i][j]) / dna_m1.v[i][j]*100
+                rel_error += abs(rel_error_m.v[i][j])
+                abs_error += abs(abs_error_m.v[i][j])
                 
+        if images_path != None:
+            abs_error_m.draw ('', images_path +'_abs_error.png', min_ = -500, max_=500, cmap = 'seismic')
+            rel_error_m.draw ('', images_path +'_rel_error.png', min_ = -20, max_=20, cmap = 'seismic')
+
+        return abs_error, rel_error
+
     def getGatherIndices (self, shot):
         return self._gatherModelIndex [shot]
 
@@ -1490,7 +1512,7 @@ def get_improvement (func, fitness_smooth_len):
     return slope/intercept
     
 
-def GA_run_on_population (helper, images_path, population, 
+def GA_run_on_population (helper, correct_individ, images_path, population, 
         generatoin_count = 30, mutation = 0.1, fitness_smooth_len = 1000):  
     
     population = helper.weight (population)
@@ -1504,6 +1526,8 @@ def GA_run_on_population (helper, images_path, population,
     
     # print start point
     helper.draw (global_best_individ, images_path + "start")
+    helper.drawError (correct_individ, global_best_individ, images_path + 'start')
+        
 
     convergence_best_func = []
 #    convergence_best_func.append (0)
@@ -1512,6 +1536,9 @@ def GA_run_on_population (helper, images_path, population,
     convergence_aver_func = []
 #    convergence_aver_func.append (0)
     
+    rel_error_func = []
+    abs_error_func = []
+
 #    convergence_aver_func_smooth = []
 #    convergence_aver_func_smooth.append (0)
     
@@ -1531,6 +1558,8 @@ def GA_run_on_population (helper, images_path, population,
             best_generation = generation
             print ("new global best!")
             helper.draw (global_best_individ, images_path + 'iter_' + str(generation))
+            helper.drawError (correct_individ, global_best_individ, images_path + 'iter_' + str(generation))
+        
 #            print ("after draw")
             writeArray (images_path + 'global_best', global_best_individ.dna)
 
@@ -1546,14 +1575,26 @@ def GA_run_on_population (helper, images_path, population,
 
         convergence_best_func.append (local_best_individ.fitness)
         convergence_aver_func.append (weight_aver)
+        
+        abs_error, rel_error = helper.drawError (correct_individ, local_best_individ, None)
+    
+        rel_error_func.append(rel_error)
+        print ("rel error", rel_error)
+        
+        abs_error_func.append(abs_error)
+        print ("abs error", abs_error)
+         
 #        convergence_aver_func_smooth = smooth (convergence_aver_func, fitness_smooth_len)
 #        convergence_best_func_smooth = smooth (convergence_best_func, fitness_smooth_len)            
         
         
-        if generation % 10 == 0:
-            import model_FD
-            model_FD.draw_convergence ([convergence_best_func], "Generation", "Fitness", "Best fitness", images_path + 'convergence_best.png')
-            model_FD.draw_convergence ([convergence_aver_func], "Generation", "Fitness", "Aver fitness", images_path + 'convergence_aver.png')
+#        if generation % 10 == 0:
+        import model_FD
+        model_FD.draw_convergence ([convergence_best_func], "Generation", "Fitness", "Best fitness", images_path + 'convergence_best.png')
+        model_FD.draw_convergence ([convergence_aver_func], "Generation", "Fitness", "Aver fitness", images_path + 'convergence_aver.png')
+        model_FD.draw_convergence ([rel_error_func], "Generation", "Error", "Relative Error of best", images_path + 'rel_error.png')
+        model_FD.draw_convergence ([abs_error_func], "Generation", "Error", "Absolute Error of best", images_path + 'abs_error.png')
+#           
 #            model_FD.draw_convergence ([convergence_aver_func_smooth], "Generation", "Fitness", "Aver fitness", images_path + 'convergence_aver_smooth.png')
 #            model_FD.draw_convergence ([convergence_best_func_smooth], "Generation", "Fitness", "Best fitness", images_path + 'convergence_best_smooth.png')
 
@@ -1566,6 +1607,7 @@ def GA_run_on_population (helper, images_path, population,
             final_individ = helper.fitness(helper.createIndivid (final_dna))
             helper.draw_gathers = True
             helper.draw (final_individ, images_path + "final")
+            helper.drawError (correct_individ, global_best_individ, images_path + 'final')
             print ("final best individual", final_individ.fitness)        
             return population
 #        
@@ -1596,5 +1638,5 @@ def GA_run (helper, images_path, correct_dna,
     if os.path.isfile(population_file):
         population = readArray (population_file)
     
-    population = GA_run_on_population(helper, images_path, population, generatoin_count, mutation)
+    population = GA_run_on_population(helper, correct_dna, images_path, population, generatoin_count, mutation)
     return population
