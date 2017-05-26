@@ -482,8 +482,8 @@ def test_correct_dna (modelGeom, orig_gathers, correct_dna,
         
 if __name__ == "__main__":
 #    model_path = '//home/cloudera/TRM/acoustic_FD_TRM/tests/evgeny/'
-    model_path = 'C:/GA/tests/evgeny/'
-#    model_path = "C:/Users/kostyad/Google Drive/Phd/Near surface/EAT/TRM/acoustic_FD_TRM/tests/evgeny/"
+#    model_path = 'C:/GA/tests/evgeny/'
+    model_path = "C:/Users/kostyad/Google Drive/Phd/Near surface/EAT/TRM/acoustic_FD_TRM/tests/evgeny/"
     if not os.path.exists(model_path):
         os.makedirs(model_path)
     
@@ -551,4 +551,4 @@ if __name__ == "__main__":
 #    exit()
         
     GA.GA_run (helper, images_path, correct_dna,
-        pop_size = 1000, generatoin_count = 1000, mutation = 0.03)    
+        pop_size = 100, generatoin_count = 1000, mutation = 0.03)    

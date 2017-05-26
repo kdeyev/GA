@@ -13,23 +13,23 @@ import os
 
 
 def getSparkContext ():
-    #######
-    # Spark
-    #######
-    from pyspark import SparkContext, SparkConf
-    
-    conf = SparkConf()
-    conf.setAppName("GA spark")
-    conf.set("spark.ui.enabled", "false" )
-    conf.setMaster("local[15]")
-#        if seisspark_config.local_spark:
-#    conf.setMaster("local")
-    sc = SparkContext(conf=conf)
-#        s_sc.addPyFile("seisspark_config.py")
-#        s_sc.addPyFile("seisspark.py")
-#        s_sc.addPyFile("segypy.py")
-    return sc
-#    return None
+#    #######
+#    # Spark
+#    #######
+#    from pyspark import SparkContext, SparkConf
+#    
+#    conf = SparkConf()
+#    conf.setAppName("GA spark")
+#    conf.set("spark.ui.enabled", "false" )
+#    conf.setMaster("local[15]")
+##        if seisspark_config.local_spark:
+##    conf.setMaster("local")
+#    sc = SparkContext(conf=conf)
+##        s_sc.addPyFile("seisspark_config.py")
+##        s_sc.addPyFile("seisspark.py")
+##        s_sc.addPyFile("segypy.py")
+#    return sc
+    return None
 
     
 g_sc = getSparkContext ()
@@ -330,6 +330,13 @@ class Individ ():
         self.addToCache = True
         self.key = str(dna)
         self.fitness = None
+        self.fitness_PS = 0.0
+        self.v = copy.deepcopy(dna)
+        for i in range(len(dna)):
+            for j in range(len(dna[0])):
+                for c in range(len(dna[0][0])):
+                    self.v[i][j][c] = 0
+        
         self.gather_individs = []
         self.fitness_func = None
         
@@ -366,17 +373,17 @@ class GA_helper ():
         return individ
         
     def applyConstraints(self, individ):
-        
-        dna = copy.deepcopy(individ.dna)
+#        dna = copy.deepcopy(individ.dna)
         for constraint in self._constraints:
-            dna = constraint.applyConstraint(dna)
+            individ.dna = constraint.applyConstraint(individ.dna)
             
-        if individ.dna == dna:
-#            print ("applyConstraints: individ was not changed")
-            return individ
-        else:
-#            print ("applyConstraints: individ was changed")
-            return self.createIndivid(dna)
+        return individ
+#        if individ.dna == dna:
+##            print ("applyConstraints: individ was not changed")
+#            return individ
+#        else:
+##            print ("applyConstraints: individ was changed")
+#            return self.createIndivid(dna)
         
     def define_FMM_energy(self):
         self.rt_energy_semb = 0
@@ -430,10 +437,10 @@ class GA_helper ():
             self.gathers[shot] = put_spike_FMM (g, tt) 
             
     def fitness(self, individ, image_path=None):
-        if individ.fitness != None:
-#            print ("individ: individ already calculated")
-            individ.addToCache=False
-            return individ
+#        if individ.fitness != None:
+##            print ("individ: individ already calculated")
+#            individ.addToCache=False
+#            return individ
         
         individ.addToCache=True
 #        print ("individ: individ not calculated")
@@ -536,10 +543,10 @@ class GA_helper ():
         
         
     def fitnessCalcGather(self, dna_m, gather_individ, image_path=None):
-        if gather_individ.fitness != None:
-            gather_individ.addToCache = False
-            return gather_individ
-            
+#        if gather_individ.fitness != None:
+#            gather_individ.addToCache = False
+#            return gather_individ
+#            
         g = self.gathers[gather_individ.shot]
 
         gather_individ.addToCache = True
@@ -1402,6 +1409,18 @@ class GA_helperI4 (GA_helper):
             submodel.append(a)
 #        print ("shot", shot, "submodel", submodel )
         return str(shot) + str(submodel)
+        
+        
+    def applyLayerConstr(self, individ):
+        for i in range(self.fmmModel.nlayer):
+            for j in range(self.fmmModel.nx):
+                individ.dna[i][j][0] = max(individ.dna[i][j][0], self._thickConstr[i][0])
+                individ.dna[i][j][0] = min(individ.dna[i][j][0], self._thickConstr[i][1])
+                
+                individ.dna[i][j][1] = max(individ.dna[i][j][1], self._velConstr[i][0])
+                individ.dna[i][j][1] = min(individ.dna[i][j][1], self._velConstr[i][1])
+
+        
 
 #def GA_test (helper, dna, pop_size, mutation = 0.1):
 #    correct = helper.fitness(dna)
@@ -1514,6 +1533,148 @@ def get_improvement (func, fitness_smooth_len):
     slope, intercept, r_value, p_value, std_err = stats.linregress(x,y)
     return slope/intercept
     
+
+def PS_run_on_population (helper, correct_individ, images_path, population, 
+        generatoin_count = 30, mutation = 0.1, fitness_smooth_len = 1000):  
+    
+    population = helper.weight (population)
+
+    best_generation = 0
+    global_best_individ = helper.getBest(population)
+    
+    print ('Init')
+#    helper.print_weight (population)
+    print ("global best individual", global_best_individ.fitness)
+    
+    # print start point
+    helper.draw (global_best_individ, images_path + "start")
+    helper.drawError (correct_individ, global_best_individ, images_path + 'start')
+        
+
+    convergence_best_func = []
+#    convergence_best_func.append (0)
+#    convergence_best_func.append (global_best_fitness)
+
+    convergence_aver_func = []
+#    convergence_aver_func.append (0)
+    
+    rel_error_func = []
+    abs_error_func = []
+
+    omega = -0.6
+    cp = -0.6
+    cg = 2
+    
+    # Simulate all of the generations.
+    for generation in range(generatoin_count):
+        for p in population:            
+            if generation > 0 and p.fitness_PS == 0: 
+                throw (42)
+            
+            if p.fitness > p.fitness_PS:
+                p.fitness_PS = p.fitness
+                p.best = p.dna
+    
+            if p.fitness > global_best_individ.fitness_PS:
+                global_best_individ = p
+                best_generation = generation                        
+                
+        new_pop = []
+
+
+        for p in population:
+            rp = random.random()
+            rg = random.random()
+            
+            for i in range(helper.fmmModel.nlayer):
+                for j in range(helper.fmmModel.nx):
+                    for c in range(2):
+                        # check that clone copy v also
+                        p.v[i][j][c] = omega*p.v[i][j][c]  \
+                                        + cp * rp * (p.best[i][j][c] - p.dna[i][j][c]) \
+                                        + cg * rg * (global_best_individ.dna[i][j][c] - p.dna[i][j][c])
+  
+            for i in range(helper.fmmModel.nlayer):
+                for j in range(helper.fmmModel.nx):
+                    for c in range(2):
+                        p.dna[i][j][c] += p.v[i][j][c]
+
+
+#            print ("dna", p.dna)
+            
+#            exit (0)
+#            v = p.v + c1 * r1 * (p.best - p.dna) \
+#                    + c2 * r2 * (global_best_individ.dna - p.dna)
+#            p.dna = p.dna + v
+
+            helper.applyConstraints(p)
+            helper.applyLayerConstr(p)
+            
+#            p = helper.fitness(p)
+
+            new_pop.append(p)
+        
+        population = helper.weight (new_pop)
+        
+#        new_best = helper.getBest (population)
+#        if new_best.fitness > global_best_individ.fitness:
+        print ("new global best!")
+        helper.draw (global_best_individ, images_path + 'iter_' + str(generation))
+        helper.drawError (correct_individ, global_best_individ, images_path + 'iter_' + str(generation))
+    
+#            print ("after draw")
+        writeArray (images_path + 'global_best', global_best_individ.dna)
+
+    
+        print ('Generation', generation)
+#        helper.print_weight (population)
+
+        print ("global best individual", best_generation, global_best_individ.fitness)
+            
+        weight_aver = sum((item.fitness for item in population))/len(population)
+        print ("Total weight", weight_aver)
+
+        convergence_best_func.append (global_best_individ.fitness)
+        convergence_aver_func.append (weight_aver)
+        
+        abs_error, rel_error = helper.drawError (correct_individ, global_best_individ, None)
+    
+        rel_error_func.append(rel_error)
+        print ("rel error", rel_error)
+        
+        abs_error_func.append(abs_error)
+        print ("abs error", abs_error)
+         
+#        convergence_aver_func_smooth = smooth (convergence_aver_func, fitness_smooth_len)
+#        convergence_best_func_smooth = smooth (convergence_best_func, fitness_smooth_len)            
+        
+        
+#        if generation % 10 == 0:
+        import model_FD
+        model_FD.draw_convergence ([convergence_best_func], "Generation", "Fitness", "Best fitness", images_path + 'convergence_best.png')
+        model_FD.draw_convergence ([convergence_aver_func], "Generation", "Fitness", "Aver fitness", images_path + 'convergence_aver.png')
+        model_FD.draw_convergence ([rel_error_func], "Generation", "Error", "Relative Error of best", images_path + 'rel_error.png')
+        model_FD.draw_convergence ([abs_error_func], "Generation", "Error", "Absolute Error of best", images_path + 'abs_error.png')
+#           
+#            model_FD.draw_convergence ([convergence_aver_func_smooth], "Generation", "Fitness", "Aver fitness", images_path + 'convergence_aver_smooth.png')
+#            model_FD.draw_convergence ([convergence_best_func_smooth], "Generation", "Fitness", "Best fitness", images_path + 'convergence_best_smooth.png')
+
+        improuvement = get_improvement (convergence_best_func, fitness_smooth_len)
+        print ("improuvement", improuvement)
+ 
+        if generation > fitness_smooth_len and improuvement < 0.001 or generation == generatoin_count-1:                
+            final_dna = helper.maximize (global_best_individ.dna)      
+            writeArray (images_path + "final", final_dna)           
+            final_individ = helper.fitness(helper.createIndivid (final_dna))
+            helper.draw_gathers = True
+            helper.draw (final_individ, images_path + "final")
+            helper.drawError (correct_individ, global_best_individ, images_path + 'final')
+            print ("final best individual", final_individ.fitness)        
+            return population
+#        
+    return population
+#        helper.fitness(local_best_ind,  image_path=images_path+'gen_'+str(generation))
+
 
 def GA_run_on_population (helper, correct_individ, images_path, population, 
         generatoin_count = 30, mutation = 0.1, fitness_smooth_len = 1000):  
@@ -1641,5 +1802,5 @@ def GA_run (helper, images_path, correct_dna,
     if os.path.isfile(population_file):
         population = readArray (population_file)
     
-    population = GA_run_on_population(helper, correct_dna, images_path, population, generatoin_count, mutation)
+    population = PS_run_on_population(helper, correct_dna, images_path, population, generatoin_count, mutation)
     return population
