@@ -1383,6 +1383,9 @@ class GA_helperI4 (GA_helper):
         if images_path != None:
             abs_error_m.draw ('', images_path +'_abs_error.png', min_ = -500, max_=500, cmap = 'seismic')
             rel_error_m.draw ('', images_path +'_rel_error.png', min_ = -20, max_=20, cmap = 'seismic')
+            
+        abs_error = abs_error/(dna_m1.nx*dna_m1.nz)
+        rel_error = rel_error/(dna_m1.nx*dna_m1.nz)
 
         return abs_error, rel_error
 

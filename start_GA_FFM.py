@@ -426,7 +426,7 @@ def prepare_helper (modelGeom, gathers, correct_dna, images_path):
     helper.putSpikeToGathers (correct_dna);
    
 #    helper.addConstraint(GA.GA_helperI4_Constraint_Well (correct_dna))
-#    helper.addConstraint(GA.GA_helperI4_Constraint_V (correct_dna))
+    helper.addConstraint(GA.GA_helperI4_Constraint_V (correct_dna))
 #    helper.addConstraint(GA.GA_helperI4_Constraint_Point(correct_dna, True, True))
 
     print ('number of combinations:', helper.caclCombinationNum ())
