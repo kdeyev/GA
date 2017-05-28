@@ -286,7 +286,6 @@ def run_SU (args, g):
 #              z_label = 'Z',
 #              figure_name = figure_name + k + '.png')
 
-
 def prepare_gather_mute_direct_offset(c, images_path ):
     gathers = []
     for shot in range(c.g_ns):
@@ -482,8 +481,8 @@ def test_correct_dna (modelGeom, orig_gathers, correct_dna,
         
 if __name__ == "__main__":
 #    model_path = '//home/cloudera/TRM/acoustic_FD_TRM/tests/evgeny/'
-#    model_path = 'C:/GA/tests/evgeny/'
-    model_path = "C:/Users/kostyad/Google Drive/Phd/Near surface/EAT/TRM/acoustic_FD_TRM/tests/evgeny/"
+    model_path = 'C:/GA/tests/evgeny/'
+#    model_path = "C:/Users/kostyad/Google Drive/Phd/Near surface/EAT/TRM/acoustic_FD_TRM/tests/evgeny/"
     if not os.path.exists(model_path):
         os.makedirs(model_path)
     
@@ -549,6 +548,8 @@ if __name__ == "__main__":
     
 #    GA.GA_test(helper,correct_dna, 1000000, mutation = 0.1)
 #    exit()
+
+#    GA.testErrors (helper, correct_dna)
         
     GA.GA_run (helper, images_path, correct_dna,
         pop_size = 100, generatoin_count = 1000, mutation = 0.03)    
