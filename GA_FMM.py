@@ -1791,8 +1791,7 @@ def testError (helper, correct_dna, error):
     individ = helper.fitness(helper.createIndivid (dna))
     print ('error', error)
     print ('after error', individ.fitness)
-    print ('after maximize', individ.fitness)
-    dna = helper.maximize (individ.dna)    
+    dna = helper.maximize (dna)   
     individ = helper.fitness(helper.createIndivid (dna))
     print ('after maximize', individ.fitness)
     if abs(individ.fitness - correct_individ.fitness) < 1:
