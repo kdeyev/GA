@@ -1561,9 +1561,9 @@ def PS_run_on_population (helper, correct_individ, images_path, population,
     rel_error_func = []
     abs_error_func = []
 
-    omega = -0.6
-    cp = -0.6
-    cg = 2
+    omega = 0
+    cp = 0.1
+    cg = 0.1
     
     # Simulate all of the generations.
     for generation in range(generatoin_count):
@@ -1778,6 +1778,33 @@ def GA_run_on_population (helper, correct_individ, images_path, population,
     return population
 #        helper.fitness(local_best_ind,  image_path=images_path+'gen_'+str(generation))
 
+def testError (helper, correct_dna, error):
+    correct_individ = helper.fitness(helper.createIndivid (correct_dna))
+    
+    dna = copy.deepcopy(correct_dna)
+    
+    for i in range(len(dna)):
+        for j in range(len(dna[0])):
+            for c in range(len(dna[0][0])):
+                dna [i][j][c] += dna [i][j][c]*random.uniform(-error, error)
+    
+    individ = helper.fitness(helper.createIndivid (dna))
+    print ('error', error)
+    print ('after error', individ.fitness)
+    print ('after maximize', individ.fitness)
+    dna = helper.maximize (individ.dna)    
+    individ = helper.fitness(helper.createIndivid (dna))
+    print ('after maximize', individ.fitness)
+    if abs(individ.fitness - correct_individ.fitness) < 1:
+        print ('success', error)
+    else:
+        print ('failed', error)
+        
+def testErrors (helper, correct_dna):
+    for error in xrange(1,10,1):
+        for tr in range (10):
+            testError (helper, correct_dna, error/100.)
+                
 def GA_run (helper, images_path, correct_dna,
         pop_size = 20, generatoin_count = 30, mutation = 0.01):  
     helper.print_info()
