@@ -1201,21 +1201,80 @@ class GA_helperI4 (GA_helper):
         dna = numpy.reshape (dna, (self.fmmModel.nlayer, self.fmmModel.nx, 2))
         return 1./self.fitness(self.createIndivid(dna)).fitness
         
-    def maximize (self, dna, options={'xatol': 0.0001, 
-                                      'fatol' : 0.00001,
-                                      'maxiter' : 10000,
-                                      'maxfev' : 10000,
-                                      'disp': False,
-#                                      'maxiter' : 5 
-                                      }):
+    def maximize_nelder_mead (self, dna):
         dna = numpy.reshape (dna, (self.fmmModel.nlayer*self.fmmModel.nx*2))
         
         from scipy.optimize import minimize
-        ret_val = minimize(self.maxFitness, dna, method='nelder-mead', options=options)
-        print (ret_val)
+        ret_val = minimize(self.maxFitness, dna, method='nelder-mead')
         dna = ret_val.get('x')
         dna = numpy.reshape (dna, (self.fmmModel.nlayer, self.fmmModel.nx, 2))
         return dna
+        
+    def maximize_basinhopping (self, dna):
+        dna = numpy.reshape (dna, (self.fmmModel.nlayer*self.fmmModel.nx*2))
+        
+        from scipy.optimize import basinhopping
+        ret_val = basinhopping(self.maxFitness, dna)
+        dna = ret_val.get('x')
+        dna = numpy.reshape (dna, (self.fmmModel.nlayer, self.fmmModel.nx, 2))
+        return dna
+        
+        
+    def maximize_BFGS (self, dna):
+        dna = numpy.reshape (dna, (self.fmmModel.nlayer*self.fmmModel.nx*2))
+        
+        from scipy.optimize import minimize
+        ret_val = minimize(self.maxFitness, dna, method='BFGS')
+        dna = ret_val.get('x')
+        dna = numpy.reshape (dna, (self.fmmModel.nlayer, self.fmmModel.nx, 2))
+        return dna
+        
+    def maximize_swarm (self, images_path):
+#        dna = numpy.reshape (dna, (self.fmmModel.nlayer*self.fmmModel.nx*2))
+        lb = []
+        ub = []
+        for i in range(self.fmmModel.nlayer):
+            for j in range(self.fmmModel.nx):
+                lb.append (self._thickConstr[i][0])
+                ub.append (self._thickConstr[i][1])
+                lb.append (self._velConstr[i][0])
+                ub.append (self._velConstr[i][1])
+                
+        from pyswarm import pso
+        dna, fopt = pso(self.maxFitness, lb, ub, maxiter=1000, swarmsize = 100)
+        dna = numpy.reshape (dna, (self.fmmModel.nlayer, self.fmmModel.nx, 2))
+                
+        individ = self.fitness(self.createIndivid (dna))
+        self.draw_gathers = True
+        self.draw (individ, images_path + "swarm_final")
+        print ("swarm individual", individ.fitness)        
+        
+    
+
+    def maximize_differential_evolution (self, images_path):
+#        dna = numpy.reshape (dna, (self.fmmModel.nlayer*self.fmmModel.nx*2))
+        bounds = []
+        for i in range(self.fmmModel.nlayer):
+            for j in range(self.fmmModel.nx):
+                bounds.append ([self._thickConstr[i][0], self._thickConstr[i][1]])
+                bounds.append ([self._velConstr[i][0], self._velConstr[i][1]])
+                
+        from scipy.optimize import differential_evolution
+        ret_val = differential_evolution(self.maxFitness, bounds=bounds, maxiter=20, popsize=15, disp=True)
+        dna = ret_val.get('x')
+        dna = numpy.reshape (dna, (self.fmmModel.nlayer, self.fmmModel.nx, 2))
+        
+        
+        individ = self.fitness(self.createIndivid (dna))
+        self.draw_gathers = True
+        self.draw (individ, images_path + "differential_evolution_final")
+        print ("maximize_differential_evolutiont individual", individ.fitness)        
+        
+        return dna
+        
+        
+    def maximize (self, dna):
+        return self.maximize_BFGS (dna)
  
         
 #    def checkChild (self, individ1, individ2, child):
@@ -1561,9 +1620,9 @@ def PS_run_on_population (helper, correct_individ, images_path, population,
     rel_error_func = []
     abs_error_func = []
 
-    omega = 0
-    cp = 0.1
-    cg = 0.1
+    omega = 0.5
+    cp = 0.5
+    cg = 0.5
     
     # Simulate all of the generations.
     for generation in range(generatoin_count):
@@ -1791,18 +1850,22 @@ def testError (helper, correct_dna, error):
     individ = helper.fitness(helper.createIndivid (dna))
     print ('error', error)
     print ('after error', individ.fitness)
-    dna = helper.maximize (dna)   
+
+    dna = helper.maximize_nelder_mead (dna)   
     individ = helper.fitness(helper.createIndivid (dna))
-    print ('after maximize', individ.fitness)
-    if abs(individ.fitness - correct_individ.fitness) < 1:
-        print ('success', error)
-    else:
-        print ('failed', error)
+    print ('after maximize_nelder_mead', individ.fitness)
+    
+    dna = helper.maximize_basinhopping (dna)   
+    individ = helper.fitness(helper.createIndivid (dna))
+    print ('after maximize_basinhopping', individ.fitness)
+
+    dna = helper.maximize_BFGS (dna)   
+    individ = helper.fitness(helper.createIndivid (dna))
+    print ('after maximize_BFGS', individ.fitness)
         
 def testErrors (helper, correct_dna):
     for error in xrange(1,10,1):
-        for tr in range (10):
-            testError (helper, correct_dna, error/100.)
+        testError (helper, correct_dna, error/100.)
                 
 def GA_run (helper, images_path, correct_dna,
         pop_size = 20, generatoin_count = 30, mutation = 0.01):  

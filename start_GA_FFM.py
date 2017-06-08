@@ -537,19 +537,14 @@ if __name__ == "__main__":
 #    modelingMultiGatherModel(model_path, helper.getModel_FD(correct_dna), False)
 #    exit ()
 
-#    testEntropy (helper, images_path)
-#    exit ()
-        
-#    testObjective (helper, correct_dna, figure_name = images_path)
-#    exit ()
-
-#    GA.MonteCarlo(helper,correct_dna, 100000, mutation = 0)
-#    exit()
+    helper.maximize_differential_evolution (images_path)
+    exit (0)
     
-#    GA.GA_test(helper,correct_dna, 1000000, mutation = 0.1)
-#    exit()
-
+#    helper.maximize_swarm (images_path)
+#    exit (0)
+#
 #    GA.testErrors (helper, correct_dna)
+#    exit (0)
         
     GA.GA_run (helper, images_path, correct_dna,
         pop_size = 100, generatoin_count = 1000, mutation = 0.03)    
