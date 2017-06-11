@@ -1229,6 +1229,18 @@ class GA_helperI4 (GA_helper):
         dna = numpy.reshape (dna, (self.fmmModel.nlayer, self.fmmModel.nx, 2))
         return dna
         
+    def maximize_CMA (self, dna):
+        dna = numpy.reshape (dna, (self.fmmModel.nlayer*self.fmmModel.nx*2))
+        
+        import cma
+        # cma.CMAOptions()  # returns all possible options
+#        options = {'CMA_diagonal':100, 'seed':1234, 'verb_time':0}
+
+        res = cma.fmin(self.maxFitness, dna, 0.5)
+        dna = res[0]
+        dna = numpy.reshape (dna, (self.fmmModel.nlayer, self.fmmModel.nx, 2))
+        return dna
+
     def maximize_swarm (self, images_path):
 #        dna = numpy.reshape (dna, (self.fmmModel.nlayer*self.fmmModel.nx*2))
         lb = []
@@ -1260,7 +1272,7 @@ class GA_helperI4 (GA_helper):
                 bounds.append ([self._velConstr[i][0], self._velConstr[i][1]])
                 
         from scipy.optimize import differential_evolution
-        ret_val = differential_evolution(self.maxFitness, bounds=bounds, maxiter=20, popsize=15, disp=True)
+        ret_val = differential_evolution(self.maxFitness, bounds=bounds, maxiter=100, popsize=15, disp=True)
         dna = ret_val.get('x')
         dna = numpy.reshape (dna, (self.fmmModel.nlayer, self.fmmModel.nx, 2))
         
@@ -1862,6 +1874,11 @@ def testError (helper, correct_dna, error):
     dna = helper.maximize_BFGS (dna)   
     individ = helper.fitness(helper.createIndivid (dna))
     print ('after maximize_BFGS', individ.fitness)
+   
+    dna = helper.maximize_CMA (dna)   
+    individ = helper.fitness(helper.createIndivid (dna))
+    print ('after maximize_CMA', individ.fitness)
+    
         
 def testErrors (helper, correct_dna):
     for error in xrange(1,10,1):
