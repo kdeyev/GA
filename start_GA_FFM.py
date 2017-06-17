@@ -537,13 +537,13 @@ if __name__ == "__main__":
 #    modelingMultiGatherModel(model_path, helper.getModel_FD(correct_dna), False)
 #    exit ()
 
-    helper.maximize_differential_evolution (images_path)
-    exit (0)
-    
+#    helper.maximize_differential_evolution (images_path)
+#    exit (0)
+#    
 #    helper.maximize_swarm (images_path)
 #    exit (0)
 #
-#    GA.testErrors (helper, correct_dna)
+#    GA.testErrors (helper, correct_dna, images_path)
 #    exit (0)
         
     GA.GA_run (helper, images_path, correct_dna,

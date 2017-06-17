@@ -1229,20 +1229,7 @@ class GA_helperI4 (GA_helper):
         dna = numpy.reshape (dna, (self.fmmModel.nlayer, self.fmmModel.nx, 2))
         return dna
         
-    def maximize_CMA (self, dna):
-        dna = numpy.reshape (dna, (self.fmmModel.nlayer*self.fmmModel.nx*2))
-        
-        import cma
-        # cma.CMAOptions()  # returns all possible options
-#        options = {'CMA_diagonal':100, 'seed':1234, 'verb_time':0}
-
-        res = cma.fmin(self.maxFitness, dna, 0.5)
-        dna = res[0]
-        dna = numpy.reshape (dna, (self.fmmModel.nlayer, self.fmmModel.nx, 2))
-        return dna
-
-    def maximize_swarm (self, images_path):
-#        dna = numpy.reshape (dna, (self.fmmModel.nlayer*self.fmmModel.nx*2))
+    def get_bounds (self, dna = None) : 
         lb = []
         ub = []
         for i in range(self.fmmModel.nlayer):
@@ -1251,6 +1238,38 @@ class GA_helperI4 (GA_helper):
                 ub.append (self._thickConstr[i][1])
                 lb.append (self._velConstr[i][0])
                 ub.append (self._velConstr[i][1])
+        
+        if dna != None:
+            for i in range (len(dna)):
+                if dna [i] < lb[i]:
+                    dna [i] = lb[i] 
+                if dna[i] > ub[i]:
+                    dna [i] = ub[i] 
+                
+        return lb, ub
+        
+    def maximize_CMA (self, dna):
+        dna = numpy.reshape (dna, (self.fmmModel.nlayer*self.fmmModel.nx*2))    
+        lb, ub = self.get_bounds (dna)
+                
+        import cma
+#        o = cma.CMAOptions()
+#        for k in o:  # returns all possible options
+#            print (k, o[k])
+#        exit (0)
+        options = {
+                   'bounds' : [lb, ub], 
+                   'maxiter' : 100,
+                   'popsize' : 100}
+
+        res = cma.fmin(self.maxFitness, dna, 0.5, options = options)
+        dna = res[0]
+        dna = numpy.reshape (dna, (self.fmmModel.nlayer, self.fmmModel.nx, 2))
+        return dna
+
+    def maximize_swarm (self, images_path):
+#        dna = numpy.reshape (dna, (self.fmmModel.nlayer*self.fmmModel.nx*2))
+        lb, ub = self.get_bounds ()
                 
         from pyswarm import pso
         dna, fopt = pso(self.maxFitness, lb, ub, maxiter=1000, swarmsize = 100)
@@ -1272,7 +1291,7 @@ class GA_helperI4 (GA_helper):
                 bounds.append ([self._velConstr[i][0], self._velConstr[i][1]])
                 
         from scipy.optimize import differential_evolution
-        ret_val = differential_evolution(self.maxFitness, bounds=bounds, maxiter=100, popsize=15, disp=True)
+        ret_val = differential_evolution(self.maxFitness, bounds=bounds, maxiter=300, popsize=15, disp=True)
         dna = ret_val.get('x')
         dna = numpy.reshape (dna, (self.fmmModel.nlayer, self.fmmModel.nx, 2))
         
@@ -1286,7 +1305,7 @@ class GA_helperI4 (GA_helper):
         
         
     def maximize (self, dna):
-        return self.maximize_BFGS (dna)
+        return self.maximize_nelder_mead (dna)
  
         
 #    def checkChild (self, individ1, individ2, child):
@@ -1819,9 +1838,9 @@ def GA_run_on_population (helper, correct_individ, images_path, population,
         abs_error_func.append(abs_error)
         print ("abs error", abs_error)
          
-#        convergence_aver_func_smooth = smooth (convergence_aver_func, fitness_smooth_len)
-#        convergence_best_func_smooth = smooth (convergence_best_func, fitness_smooth_len)            
-        
+        population_file = images_path + 'poputalion'
+        writeArray (population_file, population)
+
         
 #        if generation % 10 == 0:
         import model_FD
@@ -1849,8 +1868,11 @@ def GA_run_on_population (helper, correct_individ, images_path, population,
     return population
 #        helper.fitness(local_best_ind,  image_path=images_path+'gen_'+str(generation))
 
-def testError (helper, correct_dna, error):
+def testError (helper, correct_dna, error, images_path = None):
     correct_individ = helper.fitness(helper.createIndivid (correct_dna))
+    print ('before error', correct_individ.fitness)
+    if images_path != None:
+        helper.draw (correct_individ, images_path + "correct")
     
     dna = copy.deepcopy(correct_dna)
     
@@ -1858,31 +1880,44 @@ def testError (helper, correct_dna, error):
         for j in range(len(dna[0])):
             for c in range(len(dna[0][0])):
                 dna [i][j][c] += dna [i][j][c]*random.uniform(-error, error)
-    
-    individ = helper.fitness(helper.createIndivid (dna))
-    print ('error', error)
-    print ('after error', individ.fitness)
-
-    dna = helper.maximize_nelder_mead (dna)   
-    individ = helper.fitness(helper.createIndivid (dna))
-    print ('after maximize_nelder_mead', individ.fitness)
-    
-    dna = helper.maximize_basinhopping (dna)   
-    individ = helper.fitness(helper.createIndivid (dna))
-    print ('after maximize_basinhopping', individ.fitness)
-
-    dna = helper.maximize_BFGS (dna)   
-    individ = helper.fitness(helper.createIndivid (dna))
-    print ('after maximize_BFGS', individ.fitness)
-   
-    dna = helper.maximize_CMA (dna)   
-    individ = helper.fitness(helper.createIndivid (dna))
-    print ('after maximize_CMA', individ.fitness)
-    
         
-def testErrors (helper, correct_dna):
-    for error in xrange(1,10,1):
-        testError (helper, correct_dna, error/100.)
+    testLocalOptimization (helper, dna, images_path)
+
+def testLocalOptimization (helper, dna, images_path = None):
+    individ = helper.fitness(helper.createIndivid (dna))
+    print ('after before local', individ.fitness)
+
+    if images_path != None:
+        helper.draw (individ, images_path + "base")
+       
+    new_dna = helper.maximize_nelder_mead (dna)   
+    individ = helper.fitness(helper.createIndivid (new_dna))
+    print ('after maximize_nelder_mead', individ.fitness)
+    if images_path != None:
+        helper.draw (individ, images_path + "nelder_mead")
+    
+    new_dna = helper.maximize_basinhopping (dna)   
+    individ = helper.fitness(helper.createIndivid (new_dna))
+    print ('after maximize_basinhopping', individ.fitness)
+    if images_path != None:
+        helper.draw (individ, images_path + "basinhopping")
+        
+    new_dna = helper.maximize_BFGS (dna)   
+    individ = helper.fitness(helper.createIndivid (new_dna))
+    print ('after maximize_BFGS', individ.fitness)
+    if images_path != None:
+        helper.draw (individ, images_path + "BFGS")
+        
+    new_dna = helper.maximize_CMA (dna)   
+    individ = helper.fitness(helper.createIndivid (new_dna))
+    print ('after maximize_CMA', individ.fitness)
+    if images_path != None:
+        helper.draw (individ, images_path + "CMA")
+     
+        
+def testErrors (helper, correct_dna, images_path):
+    for error in xrange(10,15,1):
+        testError (helper, correct_dna, error/100., images_path + 'error' + str(error) + '_')
                 
 def GA_run (helper, images_path, correct_dna,
         pop_size = 20, generatoin_count = 30, mutation = 0.01):  
@@ -1904,9 +1939,9 @@ def GA_run (helper, images_path, correct_dna,
     # each initialized to a sequence of random characters.
     population = helper.random_population(pop_size)
     
-    population_file = images_path + 'poputalion'
-    if os.path.isfile(population_file):
-        population = readArray (population_file)
+#    population_file = images_path + 'poputalion'
+#    if os.path.isfile(population_file):
+#        population = readArray (population_file)
     
-    population = PS_run_on_population(helper, correct_dna, images_path, population, generatoin_count, mutation)
+    population = GA_run_on_population(helper, correct_dna, images_path, population, generatoin_count, mutation)
     return population
