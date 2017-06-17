@@ -545,6 +545,24 @@ if __name__ == "__main__":
 #
 #    GA.testErrors (helper, correct_dna, images_path)
 #    exit (0)
+
+    #####################################333
+#    global_dna = GA.readArray (images_path + 'global_best')
+#    new_dna = helper.maximize_nelder_mead (global_dna)   
+#    individ = helper.fitness(helper.createIndivid (new_dna))
+#    print ('after maximize_nelder_mead', individ.fitness)
+#    helper.draw (individ, images_path + "nelder_mead")
+#    exit (0)
+    #######################################3
+    
+    ##########################################3
+    population = GA.readArray (images_path + 'poputalion')
+#    GA.PS_run_on_population (helper, helper.createIndivid (correct_dna), images_path, population, 
+#        generatoin_count = 1000)
+    GA.GA_run_on_population (helper, helper.createIndivid (correct_dna), images_path, population, 
+        generatoin_count = 1000, mutation = 0.03)
+    exit (0)
+    ##########################################
         
     GA.GA_run (helper, images_path, correct_dna,
         pop_size = 100, generatoin_count = 1000, mutation = 0.03)    

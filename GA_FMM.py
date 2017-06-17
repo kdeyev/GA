@@ -1625,7 +1625,7 @@ def get_improvement (func, fitness_smooth_len):
     
 
 def PS_run_on_population (helper, correct_individ, images_path, population, 
-        generatoin_count = 30, mutation = 0.1, fitness_smooth_len = 1000):  
+        generatoin_count = 30, fitness_smooth_len = 1000):  
     
     population = helper.weight (population)
 
@@ -1930,18 +1930,14 @@ def GA_run (helper, images_path, correct_dna,
     if not os.path.exists(images_path):
         os.makedirs(images_path)
         
-    correct_dna = helper.fitness(helper.createIndivid(correct_dna))
+    correct_individ = helper.fitness(helper.createIndivid(correct_dna))
     print ('Correct answer:', correct_dna.fitness)
     
-    helper.draw (correct_dna, images_path + "correct")
+    helper.draw (correct_individ, images_path + "correct")
     
     # Generate initial population. This will create a list of POP_SIZE strings,
     # each initialized to a sequence of random characters.
     population = helper.random_population(pop_size)
     
-#    population_file = images_path + 'poputalion'
-#    if os.path.isfile(population_file):
-#        population = readArray (population_file)
-    
-    population = GA_run_on_population(helper, correct_dna, images_path, population, generatoin_count, mutation)
+    population = GA_run_on_population(helper, correct_individ, images_path, population, generatoin_count, mutation)
     return population
