@@ -22,7 +22,7 @@ def modelingMultiGatherModel(model_path, vel, calc):
     c.nu0 = 20 #Hz
 #    c.snap = 20
     c.snap = -1
-    c.g_ns = 101
+    c.g_ns = 11
     
         
     # enable PML
@@ -533,7 +533,7 @@ if __name__ == "__main__":
                
     helper = prepare_helper (modelGeom, gathers, correct_dna, images_path)  
 
-                   
+#    # generate synthetic data                   
 #    modelingMultiGatherModel(model_path, helper.getModel_FD(correct_dna), False)
 #    exit ()
 
@@ -556,13 +556,13 @@ if __name__ == "__main__":
     #######################################3
     
     ##########################################3
-    population = GA.readArray (images_path + 'poputalion')
+#    population = GA.readArray (images_path + 'poputalion')
 #    GA.PS_run_on_population (helper, helper.createIndivid (correct_dna), images_path, population, 
 #        generatoin_count = 1000)
-    GA.GA_run_on_population (helper, helper.createIndivid (correct_dna), images_path, population, 
-        generatoin_count = 1000, mutation = 0.03)
-    exit (0)
+#    GA.GA_run_on_population (helper, helper.createIndivid (correct_dna), images_path, population, 
+#        generatoin_count = 1000, mutation = 0.03)
+#    exit (0)
     ##########################################
         
     GA.GA_run (helper, images_path, correct_dna,
-        pop_size = 100, generatoin_count = 1000, mutation = 0.03)    
+        pop_size = 1000, generatoin_count = 1000, mutation = 0.03)    

@@ -13,22 +13,22 @@ import os
 
 
 def getSparkContext ():
-#    #######
-#    # Spark
-#    #######
-#    from pyspark import SparkContext, SparkConf
-#    
-#    conf = SparkConf()
-#    conf.setAppName("GA spark")
-#    conf.set("spark.ui.enabled", "false" )
-#    conf.setMaster("local[15]")
-##        if seisspark_config.local_spark:
-##    conf.setMaster("local")
-#    sc = SparkContext(conf=conf)
-##        s_sc.addPyFile("seisspark_config.py")
-##        s_sc.addPyFile("seisspark.py")
-##        s_sc.addPyFile("segypy.py")
-#    return sc
+    #######
+    # Spark
+    #######
+    from pyspark import SparkContext, SparkConf
+    
+    conf = SparkConf()
+    conf.setAppName("GA spark")
+    conf.set("spark.ui.enabled", "false" )
+    conf.setMaster("local[15]")
+#        if seisspark_config.local_spark:
+#    conf.setMaster("local")
+    sc = SparkContext(conf=conf)
+#        s_sc.addPyFile("seisspark_config.py")
+#        s_sc.addPyFile("seisspark.py")
+#        s_sc.addPyFile("segypy.py")
+    return sc
     return None
 
     
@@ -1931,7 +1931,7 @@ def GA_run (helper, images_path, correct_dna,
         os.makedirs(images_path)
         
     correct_individ = helper.fitness(helper.createIndivid(correct_dna))
-    print ('Correct answer:', correct_dna.fitness)
+    print ('Correct answer:', correct_individ.fitness)
     
     helper.draw (correct_individ, images_path + "correct")
     
