@@ -13,22 +13,22 @@ import os
 
 
 def getSparkContext ():
-    #######
-    # Spark
-    #######
-    from pyspark import SparkContext, SparkConf
-    
-    conf = SparkConf()
-    conf.setAppName("GA spark")
-    conf.set("spark.ui.enabled", "false" )
-    conf.setMaster("local[15]")
-#        if seisspark_config.local_spark:
-#    conf.setMaster("local")
-    sc = SparkContext(conf=conf)
-#        s_sc.addPyFile("seisspark_config.py")
-#        s_sc.addPyFile("seisspark.py")
-#        s_sc.addPyFile("segypy.py")
-    return sc
+#    #######
+#    # Spark
+#    #######
+#    from pyspark import SparkContext, SparkConf
+#    
+#    conf = SparkConf()
+#    conf.setAppName("GA spark")
+#    conf.set("spark.ui.enabled", "false" )
+#    conf.setMaster("local[15]")
+##        if seisspark_config.local_spark:
+##    conf.setMaster("local")
+#    sc = SparkContext(conf=conf)
+##        s_sc.addPyFile("seisspark_config.py")
+##        s_sc.addPyFile("seisspark.py")
+##        s_sc.addPyFile("segypy.py")
+#    return sc
     return None
 
     
@@ -1018,15 +1018,15 @@ class model_FMM:
         dna_m = model_FD.model(modelGeom.nx, modelGeom.nz, modelGeom.dx, modelGeom.dz) 
        
         vv = []
-        thth = []
+        dd = []
         for i in range (self.nlayer):  
             v = numpy.reshape(self.interpolators_v[i](dna_m.x_nodes),(dna_m.nx))
 #            print ('v', v)
             vv.append(v)
             
-            th = numpy.reshape(self.interpolators_th[i](dna_m.x_nodes),(dna_m.nx))
+            d = numpy.reshape(self.interpolators_th[i](dna_m.x_nodes),(dna_m.nx))
 #            print ('th', th)
-            thth.append(th)
+            dd.append(d)
         
         for i in range(dna_m.nx):
             layer_num = 0
@@ -1034,9 +1034,9 @@ class model_FMM:
             current_v = vv[layer_num][i]
 #            print ('current_v', current_v)
             next_z = self.sz
-            th = thth[layer_num][i]
+            depth = dd[layer_num][i]
 #            print ('th', th)
-            next_z = next_z + th
+            next_z = depth
 #            print ('next_z', next_z)
             
             for j in range (dna_m.nz):                
@@ -1044,11 +1044,11 @@ class model_FMM:
 #                print ('z', z)
                 if z > next_z:
                     layer_num += 1
-                    th = 100000
+                    depth = 100000
                     if layer_num < self.nlayer-1:
-                        th = thth[layer_num][i]
+                        depth = dd[layer_num][i]
 #                        print ('th', th)
-                    next_z = next_z + th
+                    next_z = depth
                         
                     current_v = vv[layer_num][i]
 #                    print ('current_v', current_v)
@@ -1137,25 +1137,26 @@ class GA_helperI4 (GA_helper):
         return num
             
     def _mutate(self, individ, mutation_chance):      
-        lz = int(self.modelGeom.lz())
+#        lz = int(self.modelGeom.lz())
         
         dna = copy.deepcopy(individ.dna)
         for i in range(self.fmmModel.nlayer):
             for j in range(self.fmmModel.nx):
                  if random.random() <= mutation_chance:
-                    new_th = self.random_th(dna[i][j][0], i)
-                    delta_th = new_th - dna[i][j][0]
+#                    new_th = self.random_th(dna[i][j][0], i)
+#                    delta_th = new_th - dna[i][j][0]
 
 #                    print ("_mutate", "th", dna[i][j][0], "new wth",new_th, "delta_th", delta_th )
-                    dna[i][j][0] = dna[i][j][0] + delta_th
-                    dna[i][j][0] = max (dna[i][j][0], 0)
-                    dna[i][j][0] = min (dna[i][j][0], lz)
+#                    dna[i][j][0] = dna[i][j][0] + delta_th
+#                    dna[i][j][0] = max (dna[i][j][0], 0)
+#                    dna[i][j][0] = min (dna[i][j][0], lz)
+                    dna[i][j][0] = self.random_th(dna[i][j][0], i)
                     
-                    # update layer below
-                    if i < (self.fmmModel.nlayer -1):
-                        dna[i+1][j][0] = dna[i+1][j][0] - delta_th
-                        dna[i+1][j][0] = max (dna[i+1][j][0], 0)
-                        dna[i+1][j][0] = min (dna[i+1][j][0], lz)
+#                    # update layer below
+#                    if i < (self.fmmModel.nlayer -1):
+#                        dna[i+1][j][0] = dna[i+1][j][0] - delta_th
+#                        dna[i+1][j][0] = max (dna[i+1][j][0], 0)
+#                        dna[i+1][j][0] = min (dna[i+1][j][0], lz)
 
                  if random.random() <= mutation_chance:
                      dna[i][j][1] = self.random_v_constr(dna[i][j][1], i)                
